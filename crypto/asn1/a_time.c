@@ -609,7 +609,7 @@ time_t ossl_asn1_string_to_time_t(const char *asn1_string)
     time_t timestamp_local;
 #endif
     time_t timestamp_utc;
-
+    time_t timezone;
     timestamp_asn1 = ASN1_TIME_new();
     if (!ASN1_TIME_set_string(timestamp_asn1, asn1_string))
     {
