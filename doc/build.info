@@ -1591,6 +1591,10 @@ DEPEND[html/man3/OSSL_CMP_HDR_get0_transactionID.html]=man3/OSSL_CMP_HDR_get0_tr
 GENERATE[html/man3/OSSL_CMP_HDR_get0_transactionID.html]=man3/OSSL_CMP_HDR_get0_transactionID.pod
 DEPEND[man/man3/OSSL_CMP_HDR_get0_transactionID.3]=man3/OSSL_CMP_HDR_get0_transactionID.pod
 GENERATE[man/man3/OSSL_CMP_HDR_get0_transactionID.3]=man3/OSSL_CMP_HDR_get0_transactionID.pod
+DEPEND[html/man3/OSSL_CMP_ITAV_new_caCerts.html]=man3/OSSL_CMP_ITAV_new_caCerts.pod
+GENERATE[html/man3/OSSL_CMP_ITAV_new_caCerts.html]=man3/OSSL_CMP_ITAV_new_caCerts.pod
+DEPEND[man/man3/OSSL_CMP_ITAV_new_caCerts.3]=man3/OSSL_CMP_ITAV_new_caCerts.pod
+GENERATE[man/man3/OSSL_CMP_ITAV_new_caCerts.3]=man3/OSSL_CMP_ITAV_new_caCerts.pod
 DEPEND[html/man3/OSSL_CMP_ITAV_set0.html]=man3/OSSL_CMP_ITAV_set0.pod
 GENERATE[html/man3/OSSL_CMP_ITAV_set0.html]=man3/OSSL_CMP_ITAV_set0.pod
 DEPEND[man/man3/OSSL_CMP_ITAV_set0.3]=man3/OSSL_CMP_ITAV_set0.pod
@@ -2547,6 +2551,10 @@ DEPEND[html/man3/SSL_get_fd.html]=man3/SSL_get_fd.pod
 GENERATE[html/man3/SSL_get_fd.html]=man3/SSL_get_fd.pod
 DEPEND[man/man3/SSL_get_fd.3]=man3/SSL_get_fd.pod
 GENERATE[man/man3/SSL_get_fd.3]=man3/SSL_get_fd.pod
+DEPEND[html/man3/SSL_get_handshake_rtt.html]=man3/SSL_get_handshake_rtt.pod
+GENERATE[html/man3/SSL_get_handshake_rtt.html]=man3/SSL_get_handshake_rtt.pod
+DEPEND[man/man3/SSL_get_handshake_rtt.3]=man3/SSL_get_handshake_rtt.pod
+GENERATE[man/man3/SSL_get_handshake_rtt.3]=man3/SSL_get_handshake_rtt.pod
 DEPEND[html/man3/SSL_get_peer_cert_chain.html]=man3/SSL_get_peer_cert_chain.pod
 GENERATE[html/man3/SSL_get_peer_cert_chain.html]=man3/SSL_get_peer_cert_chain.pod
 DEPEND[man/man3/SSL_get_peer_cert_chain.3]=man3/SSL_get_peer_cert_chain.pod
@@ -3289,6 +3297,7 @@ html/man3/OSSL_ALGORITHM.html \
 html/man3/OSSL_CALLBACK.html \
 html/man3/OSSL_CMP_CTX_new.html \
 html/man3/OSSL_CMP_HDR_get0_transactionID.html \
+html/man3/OSSL_CMP_ITAV_new_caCerts.html \
 html/man3/OSSL_CMP_ITAV_set0.html \
 html/man3/OSSL_CMP_MSG_get0_header.html \
 html/man3/OSSL_CMP_MSG_http_perform.html \
@@ -3528,6 +3537,7 @@ html/man3/SSL_get_error.html \
 html/man3/SSL_get_event_timeout.html \
 html/man3/SSL_get_extms_support.html \
 html/man3/SSL_get_fd.html \
+html/man3/SSL_get_handshake_rtt.html \
 html/man3/SSL_get_peer_cert_chain.html \
 html/man3/SSL_get_peer_certificate.html \
 html/man3/SSL_get_peer_signature_nid.html \
@@ -3924,6 +3934,7 @@ man/man3/OSSL_ALGORITHM.3 \
 man/man3/OSSL_CALLBACK.3 \
 man/man3/OSSL_CMP_CTX_new.3 \
 man/man3/OSSL_CMP_HDR_get0_transactionID.3 \
+man/man3/OSSL_CMP_ITAV_new_caCerts.3 \
 man/man3/OSSL_CMP_ITAV_set0.3 \
 man/man3/OSSL_CMP_MSG_get0_header.3 \
 man/man3/OSSL_CMP_MSG_http_perform.3 \
@@ -4163,6 +4174,7 @@ man/man3/SSL_get_error.3 \
 man/man3/SSL_get_event_timeout.3 \
 man/man3/SSL_get_extms_support.3 \
 man/man3/SSL_get_fd.3 \
+man/man3/SSL_get_handshake_rtt.3 \
 man/man3/SSL_get_peer_cert_chain.3 \
 man/man3/SSL_get_peer_certificate.3 \
 man/man3/SSL_get_peer_signature_nid.3 \
