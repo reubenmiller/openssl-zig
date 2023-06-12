@@ -1,4 +1,4 @@
-Welcome to the OpenSSL Project
+Welcome to the OpenSSL Project (Forked to zig-pkg support)
 ==============================
 
 [![openssl logo]][www.openssl.org]
