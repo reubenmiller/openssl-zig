@@ -19,4 +19,4 @@ jobs:
           version: master
       
       - name: Build Summary
-        run: zig build -fsummary -freference-trace
+        run: zig build --summary all -freference-trace
