@@ -246,7 +246,10 @@ MAKE0[0-9][0-9][0-9].@@@
 *.manifest
 doc-nits
 
-/zig-cache/
-/zig-out/
-/build/
-.vscode/
+# LSP (Language Server Protocol) support
+.cache/
+compile_commands.json
+
+# Zig build
+zig-cache/
+zig-out/
