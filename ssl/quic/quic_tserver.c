@@ -86,7 +86,11 @@ QUIC_TSERVER *ossl_quic_tserver_new(const QUIC_TSERVER_ARGS *args,
         goto err;
 #endif
 
-    srv->ctx = SSL_CTX_new_ex(srv->args.libctx, srv->args.propq, TLS_method());
+    if (args->ctx != NULL)
+        srv->ctx = args->ctx;
+    else
+        srv->ctx = SSL_CTX_new_ex(srv->args.libctx, srv->args.propq,
+                                  TLS_method());
     if (srv->ctx == NULL)
         goto err;
 
@@ -121,6 +125,9 @@ QUIC_TSERVER *ossl_quic_tserver_new(const QUIC_TSERVER_ARGS *args,
 
 err:
     if (srv != NULL) {
+        if (args->ctx == NULL)
+            SSL_CTX_free(srv->ctx);
+        SSL_free(srv->tls);
         ossl_quic_channel_free(srv->ch);
 #if defined(OPENSSL_THREADS)
         ossl_crypto_mutex_free(&srv->mutex);
@@ -215,9 +222,6 @@ int ossl_quic_tserver_read(QUIC_TSERVER *srv,
     int is_fin = 0;
     QUIC_STREAM *qs;
 
-    if (!ossl_quic_channel_is_active(srv->ch))
-        return 0;
-
     qs = ossl_quic_stream_map_get_by_id(ossl_quic_channel_get_qsm(srv->ch),
                                         stream_id);
     if (qs == NULL) {
@@ -227,10 +231,11 @@ int ossl_quic_tserver_read(QUIC_TSERVER *srv,
 
         /*
          * A client-initiated stream might spontaneously come into existence, so
-         * allow trying to read on a client-initiated stream before it exists.
+         * allow trying to read on a client-initiated stream before it exists,
+         * assuming the connection is still active.
          * Otherwise, fail.
          */
-        if (!is_client_init)
+        if (!is_client_init || !ossl_quic_channel_is_active(srv->ch))
             return 0;
 
         *bytes_read = 0;
@@ -389,6 +394,11 @@ int ossl_quic_tserver_stream_new(QUIC_TSERVER *srv,
 BIO *ossl_quic_tserver_get0_rbio(QUIC_TSERVER *srv)
 {
     return srv->args.net_rbio;
+}
+
+SSL_CTX *ossl_quic_tserver_get0_ssl_ctx(QUIC_TSERVER *srv)
+{
+    return srv->ctx;
 }
 
 int ossl_quic_tserver_stream_has_peer_stop_sending(QUIC_TSERVER *srv,

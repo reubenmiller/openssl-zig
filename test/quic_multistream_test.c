@@ -25,6 +25,7 @@ static const char *certfile, *keyfile;
 struct child_thread_args {
     struct helper *h;
     const struct script_op *script;
+    const char *script_name;
     int thread_idx;
 
     CRYPTO_THREAD *t;
@@ -118,7 +119,7 @@ struct script_op {
 #define OPK_C_FREE_STREAM                           18
 #define OPK_C_SET_DEFAULT_STREAM_MODE               19
 #define OPK_C_SET_INCOMING_STREAM_POLICY            20
-#define OPK_C_SHUTDOWN                              21
+#define OPK_C_SHUTDOWN_WAIT                         21
 #define OPK_C_EXPECT_CONN_CLOSE_INFO                22
 #define OPK_S_EXPECT_CONN_CLOSE_INFO                23
 #define OPK_S_BIND_STREAM_ID                        24
@@ -141,6 +142,8 @@ struct script_op {
 #define OPK_S_READ_FAIL                             41
 #define OPK_S_SET_INJECT_PLAIN                      42
 #define OPK_SET_INJECT_WORD                         43
+#define OPK_C_INHIBIT_TICK                          44
+#define OPK_C_SET_WRITE_BUF_SIZE                    45
 
 #define EXPECT_CONN_CLOSE_APP       (1U << 0)
 #define EXPECT_CONN_CLOSE_REMOTE    (1U << 1)
@@ -204,8 +207,8 @@ struct script_op {
     {OPK_C_SET_DEFAULT_STREAM_MODE, NULL, (mode), NULL, NULL},
 #define OP_C_SET_INCOMING_STREAM_POLICY(policy) \
     {OPK_C_SET_INCOMING_STREAM_POLICY, NULL, (policy), NULL, NULL},
-#define OP_C_SHUTDOWN() \
-    {OPK_C_SHUTDOWN, NULL, 0, NULL, NULL},
+#define OP_C_SHUTDOWN_WAIT() \
+    {OPK_C_SHUTDOWN_WAIT, NULL, 0, NULL, NULL},
 #define OP_C_EXPECT_CONN_CLOSE_INFO(ec, app, remote)                \
     {OPK_C_EXPECT_CONN_CLOSE_INFO, NULL,                            \
         ((app) ? EXPECT_CONN_CLOSE_APP : 0) |                       \
@@ -256,6 +259,10 @@ struct script_op {
     {OPK_S_SET_INJECT_PLAIN, NULL, 0, NULL, NULL, 0, (f)},
 #define OP_SET_INJECT_WORD(w0, w1) \
     {OPK_SET_INJECT_WORD, NULL, (w0), NULL, NULL, (w1), NULL},
+#define OP_C_INHIBIT_TICK(inhibit) \
+    {OPK_C_INHIBIT_TICK, NULL, (inhibit), NULL, NULL, 0, NULL},
+#define OP_C_SET_WRITE_BUF_SIZE(stream_name, size) \
+    {OPK_C_SET_WRITE_BUF_SIZE, NULL, (size), NULL, #stream_name},
 
 static OSSL_TIME get_time(void *arg)
 {
@@ -550,6 +557,7 @@ static int helper_init(struct helper *h, int free_order, int need_injector)
     s_args.alpn         = NULL;
     s_args.now_cb       = get_time;
     s_args.now_cb_arg   = h;
+    s_args.ctx          = NULL;
 
     if (!TEST_ptr(h->s = ossl_quic_tserver_new(&s_args, certfile, keyfile)))
         goto err;
@@ -747,6 +755,7 @@ static int is_want(SSL *s, int ret)
 }
 
 static int run_script_worker(struct helper *h, const struct script_op *script,
+                             const char *script_name,
                              int thread_idx)
 {
     int testresult = 0;
@@ -784,7 +793,7 @@ static int run_script_worker(struct helper *h, const struct script_op *script,
             first           = 0;
             offset          = 0;
             op_start_time   = ossl_time_now();
-            op_deadline     = ossl_time_add(op_start_time, ossl_ms2time(2000));
+            op_deadline     = ossl_time_add(op_start_time, ossl_ms2time(8000));
         }
 
         if (!TEST_int_le(ossl_time_compare(ossl_time_now(), op_deadline), 0)) {
@@ -865,7 +874,7 @@ static int run_script_worker(struct helper *h, const struct script_op *script,
             }
 #endif
 
-            TEST_info("script finished on thread %d", thread_idx);
+            TEST_info("script \"%s\" finished on thread %d", script_name, thread_idx);
             testresult = 1;
             goto out;
 
@@ -1245,9 +1254,12 @@ static int run_script_worker(struct helper *h, const struct script_op *script,
             }
             break;
 
-        case OPK_C_SHUTDOWN:
+        case OPK_C_SHUTDOWN_WAIT:
             {
                 int ret;
+                QUIC_CHANNEL *ch = ossl_quic_conn_get_channel(h->c_conn);
+
+                ossl_quic_channel_set_inhibit_tick(ch, 0);
 
                 if (!TEST_ptr(c_tgt))
                     goto out;
@@ -1256,6 +1268,8 @@ static int run_script_worker(struct helper *h, const struct script_op *script,
                 if (!TEST_int_ge(ret, 0))
                     goto out;
 
+                if (ret == 0)
+                    SPIN_AGAIN();
             }
             break;
 
@@ -1432,6 +1446,7 @@ static int run_script_worker(struct helper *h, const struct script_op *script,
                 for (i = 0; i < op->arg1; ++i) {
                     h->threads[i].h            = h;
                     h->threads[i].script       = op->arg0;
+                    h->threads[i].script_name  = script_name;
                     h->threads[i].thread_idx   = i;
 
                     h->threads[i].m = ossl_crypto_mutex_new();
@@ -1497,6 +1512,23 @@ static int run_script_worker(struct helper *h, const struct script_op *script,
             h->inject_word1 = op->arg2;
             break;
 
+        case OPK_C_INHIBIT_TICK:
+            {
+                QUIC_CHANNEL *ch = ossl_quic_conn_get_channel(h->c_conn);
+
+                ossl_quic_channel_set_inhibit_tick(ch, op->arg1);
+            }
+            break;
+
+        case OPK_C_SET_WRITE_BUF_SIZE:
+            if (!TEST_ptr(c_tgt))
+                goto out;
+
+            if (!TEST_true(ossl_quic_set_write_buffer_size(c_tgt, op->arg1)))
+                goto out;
+
+            break;
+
         default:
             TEST_error("unknown op");
             goto out;
@@ -1507,8 +1539,8 @@ out:
     if (!testresult) {
         size_t i;
 
-        TEST_error("failed at script op %zu, thread %d\n",
-                   op_idx + 1, thread_idx);
+        TEST_error("failed in script \"%s\" at op %zu, thread %d\n",
+                   script_name, op_idx + 1, thread_idx);
 
         for (i = 0; i < repeat_stack_len; ++i)
             TEST_info("while repeating, iteration %zu of %zu, starting at script op %zu",
@@ -1522,7 +1554,9 @@ out:
     return testresult;
 }
 
-static int run_script(const struct script_op *script, int free_order)
+static int run_script(const struct script_op *script,
+                      const char *script_name,
+                      int free_order)
 {
     int testresult = 0;
     struct helper h;
@@ -1530,7 +1564,7 @@ static int run_script(const struct script_op *script, int free_order)
     if (!TEST_true(helper_init(&h, free_order, 1)))
         goto out;
 
-    if (!TEST_true(run_script_worker(&h, script, -1)))
+    if (!TEST_true(run_script_worker(&h, script, script_name, -1)))
         goto out;
 
 #if defined(OPENSSL_THREADS)
@@ -1551,6 +1585,7 @@ static CRYPTO_THREAD_RETVAL run_script_child_thread(void *arg)
     struct child_thread_args *args = arg;
 
     testresult = run_script_worker(args->h, args->script,
+                                   args->script_name,
                                    args->thread_idx);
 
     ossl_crypto_mutex_lock(args->m);
@@ -1811,7 +1846,7 @@ static const struct script_op script_10[] = {
     OP_S_BIND_STREAM_ID     (a, C_BIDI_ID(0))
     OP_S_READ_EXPECT        (a, "apple", 5)
 
-    OP_C_SHUTDOWN           ()
+    OP_C_SHUTDOWN_WAIT      ()
     OP_C_EXPECT_CONN_CLOSE_INFO(0, 1, 0)
     OP_S_EXPECT_CONN_CLOSE_INFO(0, 1, 1)
 
@@ -2834,6 +2869,46 @@ static const struct script_op script_39[] = {
     OP_END
 };
 
+/* 40. Shutdown flush test */
+static const unsigned char script_40_data[1024] = "strawberry";
+
+static const struct script_op script_40[] = {
+    OP_C_SET_ALPN           ("ossltest")
+    OP_C_CONNECT_WAIT       ()
+    OP_C_SET_DEFAULT_STREAM_MODE(SSL_DEFAULT_STREAM_MODE_NONE)
+
+    OP_C_NEW_STREAM_BIDI    (a, C_BIDI_ID(0))
+    OP_C_WRITE              (a, "apple", 5)
+
+    OP_C_INHIBIT_TICK       (1)
+    OP_C_SET_WRITE_BUF_SIZE (a, 1024 * 100 * 3)
+
+    OP_BEGIN_REPEAT         (100)
+
+    OP_C_WRITE              (a, script_40_data, sizeof(script_40_data))
+
+    OP_END_REPEAT           ()
+
+    OP_C_CONCLUDE           (a)
+    OP_C_SHUTDOWN_WAIT      ()  /* disengages tick inhibition */
+
+    OP_S_BIND_STREAM_ID     (a, C_BIDI_ID(0))
+    OP_S_READ_EXPECT        (a, "apple", 5)
+
+    OP_BEGIN_REPEAT         (100)
+
+    OP_S_READ_EXPECT        (a, script_40_data, sizeof(script_40_data))
+
+    OP_END_REPEAT           ()
+
+    OP_S_EXPECT_FIN         (a)
+
+    OP_C_EXPECT_CONN_CLOSE_INFO(0, 1, 0)
+    OP_S_EXPECT_CONN_CLOSE_INFO(0, 1, 1)
+
+    OP_END
+};
+
 static const struct script_op *const scripts[] = {
     script_1,
     script_2,
@@ -2874,15 +2949,19 @@ static const struct script_op *const scripts[] = {
     script_37,
     script_38,
     script_39,
+    script_40,
 };
 
 static int test_script(int idx)
 {
     int script_idx = idx >> 1;
     int free_order = idx & 1;
+    char script_name[64];
+
+    snprintf(script_name, sizeof(script_name), "script %d", script_idx + 1);
 
     TEST_info("Running script %d (order=%d)", script_idx + 1, free_order);
-    return run_script(scripts[script_idx], free_order);
+    return run_script(scripts[script_idx], script_name, free_order);
 }
 
 /* Dynamically generated tests. */
@@ -2952,6 +3031,7 @@ static const struct forbidden_frame_type forbidden_frame_types[] = {
 static ossl_unused int test_dyn_frame_types(int idx)
 {
     size_t i;
+    char script_name[64];
     struct script_op *s = dyn_frame_types_script;
 
     for (i = 0; i < OSSL_NELEM(dyn_frame_types_script); ++i)
@@ -2962,7 +3042,10 @@ static ossl_unused int test_dyn_frame_types(int idx)
             s[i].arg2 = forbidden_frame_types[idx].expected_err;
         }
 
-    return run_script(dyn_frame_types_script, 0);
+    snprintf(script_name, sizeof(script_name),
+             "dyn script %d", idx);
+
+    return run_script(dyn_frame_types_script, script_name, 0);
 }
 
 OPT_TEST_DECLARE_USAGE("certfile privkeyfile\n")

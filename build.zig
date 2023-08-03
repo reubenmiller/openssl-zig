@@ -22,16 +22,17 @@ fn libcrypto(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin.O
         .optimize = optimize,
     });
     const t = lib.target_info.target;
+    lib.pie = true;
     switch (optimize) {
         .Debug, .ReleaseSafe => lib.bundle_compiler_rt = true,
         else => lib.strip = true,
     }
-    lib.addIncludePath("include");
-    lib.addIncludePath(".");
-    lib.addIncludePath("providers/common/include");
-    lib.addIncludePath("providers/fips");
-    lib.addIncludePath("providers/implementations/include");
-    lib.addIncludePath("include_gen");
+    lib.addIncludePath(.{ .path = "include" });
+    lib.addIncludePath(.{ .path = "." });
+    lib.addIncludePath(.{ .path = "providers/common/include" });
+    lib.addIncludePath(.{ .path = "providers/fips" });
+    lib.addIncludePath(.{ .path = "providers/implementations/include" });
+    lib.addIncludePath(.{ .path = "include_gen" });
     // lib.defineCMacro("OPENSSL_NO_DEPRECATED", null);
     lib.defineCMacro("OPENSSL_NO_ENGINE", null);
     lib.defineCMacro("OPENSSL_NO_SRP", null);
@@ -857,12 +858,13 @@ fn libssl(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin.Opti
         .optimize = optimize,
     });
     const t = lib.target_info.target;
+    lib.pie = true;
     switch (optimize) {
         .Debug, .ReleaseSafe => lib.bundle_compiler_rt = true,
         else => lib.strip = true,
     }
-    lib.addIncludePath("include");
-    lib.addIncludePath("include_gen");
+    lib.addIncludePath(.{ .path = "include" });
+    lib.addIncludePath(.{ .path = "include_gen" });
     lib.defineCMacro("OPENSSL_NO_DEPRECATED", null);
     lib.defineCMacro("OPENSSL_NO_ENGINE", null);
     lib.defineCMacro("OPENSSL_NO_SRP", null);
@@ -968,16 +970,12 @@ fn libprovider(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin
         .optimize = optimize,
     });
     const t = lib.target_info.target;
-    switch (optimize) {
-        .Debug, .ReleaseSafe => lib.bundle_compiler_rt = true,
-        else => lib.strip = true,
-    }
-    lib.addIncludePath("include");
-    lib.addIncludePath(".");
-    lib.addIncludePath("providers/common/include");
-    lib.addIncludePath("providers/fips");
-    lib.addIncludePath("providers/implementations/include");
-    lib.addIncludePath("include_gen");
+    lib.addIncludePath(.{ .path = "include" });
+    lib.addIncludePath(.{ .path = "." });
+    lib.addIncludePath(.{ .path = "providers/common/include" });
+    lib.addIncludePath(.{ .path = "providers/fips" });
+    lib.addIncludePath(.{ .path = "providers/implementations/include" });
+    lib.addIncludePath(.{ .path = "include_gen" });
     lib.defineCMacro("OPENSSL_NO_DEPRECATED", null);
     lib.defineCMacro("OPENSSL_NO_ENGINE", null);
     lib.defineCMacro("OPENSSL_NO_SRP", null);
@@ -990,7 +988,7 @@ fn libprovider(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin
         // CommonCrypto
         lib.linkFramework("CoreServices");
         lib.defineCMacro("OPENSSL_SYS_MACOSX", "1");
-        lib.addSystemIncludePath("/usr/include");
+        lib.addSystemIncludePath(.{ .path = "/usr/include" });
     }
     if (t.isMinGW())
         lib.defineCMacro("NOCRYPT", "1");
@@ -1199,25 +1197,6 @@ fn libprovider(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin
     }, cflags);
     lib.linkLibC();
     return lib;
-}
-
-fn buildFuzz(b: *std.Build, libs: anytype, info: BuildInfo) void {
-    const exe = b.addExecutable(.{
-        .name = info.filename(),
-        .target = libs[0].target,
-        .optimize = libs[0].optimize,
-    });
-    exe.linkLibrary(libs[0]);
-    exe.linkLibrary(libs[1]);
-    exe.addIncludePath("test");
-    exe.addIncludePath("apps/include");
-    exe.addCSourceFiles(&.{
-        info.path,
-    }, cflags);
-    exe.installLibraryHeaders(libs[0]);
-    exe.installLibraryHeaders(libs[1]);
-    exe.linkLibC();
-    b.installArtifact(exe);
 }
 
 const cflags = &.{

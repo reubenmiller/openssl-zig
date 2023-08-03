@@ -2141,6 +2141,13 @@ static int txp_generate_stream_frames(OSSL_QUIC_TX_PACKETISER *txp,
         if (shdr->is_fin)
             chunks[(i + 1) % 2].valid = 0;
 
+        /*
+         * We are now committed to our length (shdr->len can't change).
+         * If we truncated the chunk, clear the FIN bit.
+         */
+        if (shdr->len < orig_len)
+            shdr->is_fin = 0;
+
         /* Truncate IOVs to match our chosen length. */
         ossl_quic_sstream_adjust_iov((size_t)shdr->len, chunks[i % 2].iov,
                                      chunks[i % 2].num_stream_iovec);
@@ -2962,8 +2969,9 @@ OSSL_TIME ossl_quic_tx_packetiser_get_deadline(OSSL_QUIC_TX_PACKETISER *txp)
         }
 
     /* When will CC let us send more? */
-    deadline = ossl_time_min(deadline,
-                             txp->args.cc_method->get_wakeup_deadline(txp->args.cc_data));
+    if (txp->args.cc_method->get_tx_allowance(txp->args.cc_data) == 0)
+        deadline = ossl_time_min(deadline,
+                                 txp->args.cc_method->get_wakeup_deadline(txp->args.cc_data));
 
     return deadline;
 }
