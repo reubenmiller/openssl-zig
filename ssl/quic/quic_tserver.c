@@ -308,8 +308,10 @@ int ossl_quic_tserver_has_read_ended(QUIC_TSERVER *srv, uint64_t stream_id)
     if (is_fin && bytes_read == 0) {
         /* If we have a FIN awaiting retirement and no data before it... */
         /* Let RSTREAM know we've consumed this FIN. */
-        ossl_quic_rstream_read(qs->rstream, buf, sizeof(buf),
-                               &bytes_read, &is_fin); /* best effort */
+        if (!ossl_quic_rstream_read(qs->rstream, buf, sizeof(buf),
+                                    &bytes_read, &is_fin))
+            return 0;
+
         assert(is_fin && bytes_read == 0);
         assert(qs->recv_state == QUIC_RSTREAM_STATE_DATA_RECVD);
 
@@ -488,7 +490,7 @@ OSSL_TIME ossl_quic_tserver_get_deadline(QUIC_TSERVER *srv)
 
 int ossl_quic_tserver_shutdown(QUIC_TSERVER *srv)
 {
-    ossl_quic_channel_local_close(srv->ch, 0);
+    ossl_quic_channel_local_close(srv->ch, 0, NULL);
 
     /* TODO(QUIC): !SSL_SHUTDOWN_FLAG_NO_STREAM_FLUSH */
 
@@ -510,4 +512,20 @@ int ossl_quic_tserver_ping(QUIC_TSERVER *srv)
 
     ossl_quic_reactor_tick(ossl_quic_channel_get_reactor(srv->ch), 0);
     return 1;
+}
+
+QUIC_CHANNEL *ossl_quic_tserver_get_channel(QUIC_TSERVER *srv)
+{
+    return srv->ch;
+}
+
+void ossl_quic_tserver_set_msg_callback(QUIC_TSERVER *srv,
+                                        void (*f)(int write_p, int version,
+                                                  int content_type,
+                                                  const void *buf, size_t len,
+                                                  SSL *ssl, void *arg),
+                                        void *arg)
+{
+    ossl_quic_channel_set_msg_callback(srv->ch, f, NULL);
+    ossl_quic_channel_set_msg_callback_arg(srv->ch, arg);
 }

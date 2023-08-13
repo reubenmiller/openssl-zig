@@ -254,7 +254,7 @@ static int ossl_unused expect_quic_with_stream_lock(const SSL *s, int remote_ini
         goto err;
     }
 
-    return 1; /* lock held */
+    return 1; /* coverity[missing_unlock]: lock held */
 
 err:
     quic_unlock(ctx->qc);
@@ -375,7 +375,7 @@ SSL *ossl_quic_new(SSL_CTX *ctx)
         = (ssl_base->method == OSSL_QUIC_client_thread_method());
 #endif
 
-    qc->as_server       = 0; /* TODO(QUIC): server support */
+    qc->as_server       = 0; /* TODO(QUIC SERVER): add server support */
     qc->as_server_state = qc->as_server;
 
     qc->default_stream_mode     = SSL_DEFAULT_STREAM_MODE_AUTO_BIDI;
@@ -547,7 +547,7 @@ int ossl_quic_clear(SSL *s)
     if (!expect_quic(s, &ctx))
         return 0;
 
-    /* TODO(QUIC): Currently a no-op. */
+    /* TODO(QUIC FUTURE): Currently a no-op. */
     return 1;
 }
 
@@ -1172,7 +1172,6 @@ int ossl_quic_conn_shutdown(SSL *s, uint64_t flags,
         return -1;
 
     if (ctx.is_stream)
-        /* TODO(QUIC): Semantics currently undefined for QSSOs */
         return -1;
 
     quic_lock(ctx.qc);
@@ -1187,10 +1186,15 @@ int ossl_quic_conn_shutdown(SSL *s, uint64_t flags,
         qc_shutdown_flush_init(ctx.qc);
 
         if (!qc_shutdown_flush_finished(ctx.qc)) {
-            if (qc_blocking_mode(ctx.qc))
-                block_until_pred(ctx.qc, quic_shutdown_flush_wait, ctx.qc, 0);
-            else
+            if (qc_blocking_mode(ctx.qc)) {
+                ret = block_until_pred(ctx.qc, quic_shutdown_flush_wait, ctx.qc, 0);
+                if (ret < 1) {
+                    ret = 0;
+                    goto err;
+                }
+            } else {
                 ossl_quic_reactor_tick(ossl_quic_channel_get_reactor(ctx.qc->ch), 0);
+            }
         }
 
         if (!qc_shutdown_flush_finished(ctx.qc)) {
@@ -1201,7 +1205,8 @@ int ossl_quic_conn_shutdown(SSL *s, uint64_t flags,
 
     /* Phase 2: Connection Closure */
     ossl_quic_channel_local_close(ctx.qc->ch,
-                                  args != NULL ? args->quic_error_code : 0);
+                                  args != NULL ? args->quic_error_code : 0,
+                                  args != NULL ? args->quic_reason : NULL);
 
     SSL_set_shutdown(ctx.qc->tls, SSL_SENT_SHUTDOWN);
 
@@ -1211,12 +1216,18 @@ int ossl_quic_conn_shutdown(SSL *s, uint64_t flags,
     }
 
     /* Phase 3: Terminating Wait Time */
-    if (qc_blocking_mode(ctx.qc) && (flags & SSL_SHUTDOWN_FLAG_RAPID) == 0)
-        block_until_pred(ctx.qc, quic_shutdown_wait, ctx.qc, 0);
-    else
+    if (qc_blocking_mode(ctx.qc) && (flags & SSL_SHUTDOWN_FLAG_RAPID) == 0) {
+        ret = block_until_pred(ctx.qc, quic_shutdown_wait, ctx.qc, 0);
+        if (ret < 1) {
+            ret = 0;
+            goto err;
+        }
+    } else {
         ossl_quic_reactor_tick(ossl_quic_channel_get_reactor(ctx.qc->ch), 0);
+    }
 
     ret = ossl_quic_channel_is_terminated(ctx.qc->ch);
+err:
     quic_unlock(ctx.qc);
     return ret;
 }
@@ -1412,7 +1423,6 @@ static int quic_do_handshake(QCTX *ctx)
     }
 
     if (qc->as_server != qc->as_server_state) {
-        /* TODO(QUIC): Must match the method used to create the QCSO */
         QUIC_RAISE_NON_NORMAL_ERROR(ctx, ERR_R_PASSED_INVALID_ARGUMENT, NULL);
         return -1; /* Non-protocol error */
     }
@@ -1800,8 +1810,8 @@ static void quic_post_write(QUIC_XSO *xso, int did_append, int do_tick)
     /*
      * Try and send.
      *
-     * TODO(QUIC): It is probably inefficient to try and do this immediately,
-     * plus we should eventually consider Nagle's algorithm.
+     * TODO(QUIC FUTURE): It is probably inefficient to try and do this
+     * immediately, plus we should eventually consider Nagle's algorithm.
      */
     if (do_tick)
         ossl_quic_reactor_tick(ossl_quic_channel_get_reactor(xso->conn->ch), 0);
@@ -2555,9 +2565,11 @@ int ossl_quic_set_default_stream_mode(SSL *s, uint32_t mode)
 
     quic_lock(ctx.qc);
 
-    if (ctx.qc->default_xso_created)
+    if (ctx.qc->default_xso_created) {
+        quic_unlock(ctx.qc);
         return QUIC_RAISE_NON_NORMAL_ERROR(&ctx, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED,
                                            "too late to change default stream mode");
+    }
 
     switch (mode) {
     case SSL_DEFAULT_STREAM_MODE_NONE:
@@ -3045,8 +3057,8 @@ int ossl_quic_get_conn_close_info(SSL *ssl,
         return 0;
 
     info->error_code    = tc->error_code;
-    info->reason        = NULL; /* TODO(QUIC): Wire reason */
-    info->reason_len    = 0;
+    info->reason        = tc->reason;
+    info->reason_len    = tc->reason_len;
     info->is_local      = !tc->remote;
     info->is_transport  = !tc->app;
     return 1;

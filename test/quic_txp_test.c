@@ -214,6 +214,8 @@ static int helper_init(struct helper *h)
     if (!TEST_true(ossl_qrx_add_dst_conn_id(h->qrx, &dcid_1)))
         goto err;
 
+    ossl_qrx_allow_1rtt_processing(h->qrx);
+
     rc = 1;
 err:
     if (!rc)
@@ -421,7 +423,7 @@ static int schedule_cfq_new_conn_id(struct helper *h)
 
     if (!TEST_ptr(cfq_item = ossl_quic_cfq_add_frame(h->args.cfq, 1,
                                                      QUIC_PN_SPACE_APP,
-                                                     OSSL_QUIC_FRAME_TYPE_NEW_CONN_ID,
+                                                     OSSL_QUIC_FRAME_TYPE_NEW_CONN_ID, 0,
                                                      (unsigned char *)buf_mem->data, l,
                                                      free_buf_mem,
                                                      buf_mem)))
@@ -497,7 +499,7 @@ static int schedule_cfq_new_token(struct helper *h)
 
     if (!TEST_ptr(cfq_item = ossl_quic_cfq_add_frame(h->args.cfq, 1,
                                                      QUIC_PN_SPACE_APP,
-                                                     OSSL_QUIC_FRAME_TYPE_NEW_TOKEN,
+                                                     OSSL_QUIC_FRAME_TYPE_NEW_TOKEN, 0,
                                                      (unsigned char *)buf_mem->data, l,
                                                      free_buf_mem,
                                                      buf_mem)))
@@ -1548,7 +1550,6 @@ err:
 
 static int test_script(int idx)
 {
-    if (idx + 1 != 18) return 1;
     return run_script(idx, scripts[idx]);
 }
 
