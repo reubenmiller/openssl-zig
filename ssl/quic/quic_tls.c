@@ -84,6 +84,8 @@ struct ossl_record_layer_st {
     void *cbarg;
 };
 
+static int quic_set1_bio(OSSL_RECORD_LAYER *rl, BIO *bio);
+
 static int
 quic_new_record_layer(OSSL_LIB_CTX *libctx, const char *propq, int vers,
                       int role, int direction, int level, uint16_t epoch,
@@ -111,7 +113,10 @@ quic_new_record_layer(OSSL_LIB_CTX *libctx, const char *propq, int vers,
 
     rl->qtls = (QUIC_TLS *)rlarg;
     rl->level = level;
-    rl->dummybio = transport;
+    if (!quic_set1_bio(rl, transport)) {
+        QUIC_TLS_FATAL(rl, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+        goto err;
+    }
     rl->cbarg = cbarg;
     *retrl = rl;
 
@@ -167,7 +172,7 @@ quic_new_record_layer(OSSL_LIB_CTX *libctx, const char *propq, int vers,
     }
 
     /* We pass a ref to the md in a successful yield_secret_cb call */
-    /* TODO(QUIC): This cast is horrible. We should try and remove it */
+    /* TODO(QUIC FUTURE): This cast is horrible. We should try and remove it */
     if (!EVP_MD_up_ref((EVP_MD *)kdfdigest)) {
         QUIC_TLS_FATAL(rl, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
         goto err;
@@ -193,6 +198,7 @@ static int quic_free(OSSL_RECORD_LAYER *rl)
     if (rl == NULL)
         return 1;
 
+    BIO_free(rl->dummybio);
     OPENSSL_free(rl);
     return 1;
 }
@@ -524,10 +530,11 @@ static int quic_free_buffers(OSSL_RECORD_LAYER *rl)
 
 static int quic_set1_bio(OSSL_RECORD_LAYER *rl, BIO *bio)
 {
-    /*
-     * Can be called to set the buffering BIO - which is then never used by us.
-     * We ignore it
-     */
+    if (bio != NULL && !BIO_up_ref(bio))
+        return 0;
+    BIO_free(rl->dummybio);
+    rl->dummybio = bio;
+
     return 1;
 }
 
@@ -841,4 +848,31 @@ int ossl_quic_tls_get_error(QUIC_TLS *qtls,
     }
 
     return qtls->inerror;
+}
+
+/*
+ * Returns true if the last handshake record message we processed was a
+ * CertificateRequest
+ */
+int ossl_quic_tls_is_cert_request(QUIC_TLS *qtls)
+{
+    SSL_CONNECTION *sc = SSL_CONNECTION_FROM_SSL(qtls->args.s);
+
+    return sc->s3.tmp.message_type == SSL3_MT_CERTIFICATE_REQUEST;
+}
+
+/*
+ * Returns true if the last session associated with the connection has an
+ * invalid max_early_data value for QUIC.
+ */
+int ossl_quic_tls_has_bad_max_early_data(QUIC_TLS *qtls)
+{
+    uint32_t max_early_data = SSL_get0_session(qtls->args.s)->ext.max_early_data;
+
+    /*
+     * If max_early_data was present we always ensure a non-zero value is
+     * stored in the session for QUIC. Therefore if max_early_data == 0 here
+     * we can be confident that it was not present in the NewSessionTicket
+     */
+    return max_early_data != 0xffffffff && max_early_data != 0;
 }
