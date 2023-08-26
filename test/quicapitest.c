@@ -374,7 +374,7 @@ static void strip_line_ends(char *str)
 
 static int compare_with_file(BIO *membio)
 {
-    BIO *file = NULL;
+    BIO *file = NULL, *newfile = NULL;
     char buf1[512], buf2[512];
     char *reffile;
     int ret = 0;
@@ -386,6 +386,19 @@ static int compare_with_file(BIO *membio)
 
     file = BIO_new_file(reffile, "rb");
     if (!TEST_ptr(file))
+        goto err;
+
+    newfile = BIO_new_file("ssltraceref-new.txt", "wb");
+    if (!TEST_ptr(newfile))
+        goto err;
+
+    while (BIO_gets(membio, buf2, sizeof(buf2)) > 0)
+        if (BIO_puts(newfile, buf2) <= 0) {
+            TEST_error("Failed writing new file data");
+            goto err;
+        }
+
+    if (!TEST_int_ge(BIO_seek(membio, 0), 0))
         goto err;
 
     while (BIO_gets(file, buf1, sizeof(buf1)) > 0) {
@@ -417,6 +430,7 @@ static int compare_with_file(BIO *membio)
  err:
     OPENSSL_free(reffile);
     BIO_free(file);
+    BIO_free(newfile);
     return ret;
 }
 
@@ -442,7 +456,9 @@ static int test_ssl_trace(void)
     if (!TEST_ptr(cctx)
             || !TEST_ptr(bio)
             || !TEST_true(qtest_create_quic_objects(libctx, cctx, NULL, cert,
-                                                    privkey, 0, &qtserv,
+                                                    privkey,
+                                                    QTEST_FLAG_FAKE_TIME,
+                                                    &qtserv,
                                                     &clientquic, NULL)))
         goto err;
 
@@ -933,6 +949,60 @@ static int test_back_pressure(void)
     return testresult;
 }
 
+
+static int dgram_ctr = 0;
+
+static void dgram_cb(int write_p, int version, int content_type,
+                     const void *buf, size_t msglen, SSL *ssl, void *arg)
+{
+    if (!write_p)
+        return;
+
+    if (content_type != SSL3_RT_QUIC_DATAGRAM)
+        return;
+
+    dgram_ctr++;
+}
+
+/* Test that we send multiple datagrams in one go when appropriate */
+static int test_multiple_dgrams(void)
+{
+    SSL_CTX *cctx = SSL_CTX_new_ex(libctx, NULL, OSSL_QUIC_client_method());
+    SSL *clientquic = NULL;
+    QUIC_TSERVER *qtserv = NULL;
+    int testresult = 0;
+    unsigned char *buf;
+    const size_t buflen = 1400;
+    size_t written;
+
+    buf = OPENSSL_zalloc(buflen);
+
+    if (!TEST_ptr(cctx)
+            || !TEST_ptr(buf)
+            || !TEST_true(qtest_create_quic_objects(libctx, cctx, NULL, cert,
+                                                    privkey, 0, &qtserv,
+                                                    &clientquic, NULL))
+            || !TEST_true(qtest_create_quic_connection(qtserv, clientquic)))
+        goto err;
+
+    dgram_ctr = 0;
+    SSL_set_msg_callback(clientquic, dgram_cb);
+    if (!TEST_true(SSL_write_ex(clientquic, buf, buflen, &written))
+            || !TEST_size_t_eq(written, buflen)
+               /* We wrote enough data for 2 datagrams */
+            || !TEST_int_eq(dgram_ctr, 2))
+        goto err;
+
+    testresult = 1;
+ err:
+    OPENSSL_free(buf);
+    SSL_free(clientquic);
+    ossl_quic_tserver_free(qtserv);
+    SSL_CTX_free(cctx);
+
+    return testresult;
+}
+
 OPT_TEST_DECLARE_USAGE("provider config certsdir datadir\n")
 
 int setup_tests(void)
@@ -1001,6 +1071,7 @@ int setup_tests(void)
     ADD_ALL_TESTS(test_quic_set_fd, 3);
     ADD_TEST(test_bio_ssl);
     ADD_TEST(test_back_pressure);
+    ADD_TEST(test_multiple_dgrams);
     return 1;
  err:
     cleanup_tests();

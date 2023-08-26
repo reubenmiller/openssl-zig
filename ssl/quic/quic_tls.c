@@ -230,7 +230,8 @@ static int quic_processed_read_pending(OSSL_RECORD_LAYER *rl)
     return 0;
 }
 
-static size_t quic_get_max_records(OSSL_RECORD_LAYER *rl, int type, size_t len,
+static size_t quic_get_max_records(OSSL_RECORD_LAYER *rl, uint8_t type,
+                                   size_t len,
                                    size_t maxfrag, size_t *preffrag)
 {
     return 1;
@@ -356,7 +357,7 @@ static int quic_retry_write_records(OSSL_RECORD_LAYER *rl)
 }
 
 static int quic_read_record(OSSL_RECORD_LAYER *rl, void **rechandle,
-                            int *rversion, int *type, const unsigned char **data,
+                            int *rversion, uint8_t *type, const unsigned char **data,
                             size_t *datalen, uint16_t *epoch,
                             unsigned char *seq_num)
 {
@@ -671,8 +672,8 @@ static int raise_error(QUIC_TLS *qtls, uint64_t error_code,
     ERR_new();
     ERR_set_debug(src_file, src_line, src_func);
     ERR_set_error(ERR_LIB_SSL, SSL_R_QUIC_HANDSHAKE_LAYER_ERROR,
-                  "handshake layer error, error code %zu (\"%s\")",
-                  error_code, error_msg);
+                  "handshake layer error, error code %llu (\"%s\")",
+                  (unsigned long long)error_code, error_msg);
     OSSL_ERR_STATE_save_to_mark(qtls->error_state);
 
     /*
@@ -699,13 +700,6 @@ int ossl_quic_tls_tick(QUIC_TLS *qtls)
     int ret, err;
     const unsigned char *alpn;
     unsigned int alpnlen;
-
-    /*
-     * TODO(QUIC): There are various calls here that could fail and ordinarily
-     * would result in an ERR_raise call - but "tick" calls aren't supposed to
-     * fail "loudly" - so its unclear how we will report these errors. The
-     * ERR_raise calls are omitted from this function for now.
-     */
 
     if (qtls->inerror)
         return 0;
