@@ -49,6 +49,28 @@ fn libcrypto(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin.O
     if (t.isDarwin())
         // CommonCrypto
         lib.linkFramework("CoreServices");
+    lib.addCSourceFiles(switch (target.getCpuArch()) {
+        .arm, .aarch64 => &.{
+            "crypto/armcap.c",
+        },
+        .powerpc => &.{
+            "crypto/ppccap.c",
+        },
+        .riscv64 => &.{
+            "crypto/riscvcap.c",
+        },
+        .s390x => &.{
+            "crypto/bn/bn_s390x.c",
+            "crypto/ec/ecp_s390x_nistp.c",
+            "crypto/ec/ecx_s390x.c",
+            "crypto/s390xcap.c",
+        },
+        .sparc, .sparc64 => &.{
+            "crypto/bn/bn_sparc.c",
+            "crypto/sparcv9cap.c",
+        },
+        else => &.{},
+    }, cflags);
     lib.addCSourceFiles(&.{
         // "crypto/LPdir_nyi.c",
         // "crypto/LPdir_unix.c",
@@ -66,7 +88,6 @@ fn libcrypto(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin.O
         "crypto/aes/aes_wrap.c",
         "crypto/aes/aes_x86core.c",
         "crypto/aria/aria.c",
-        // "crypto/armcap.c",
         "crypto/asn1/a_bitstr.c",
         "crypto/asn1/a_d2i_fp.c",
         "crypto/asn1/a_digest.c",
@@ -133,8 +154,10 @@ fn libcrypto(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin.O
         "crypto/asn1/x_val.c",
         "crypto/asn1_dsa.c",
         "crypto/async/arch/async_null.c",
-        "crypto/async/arch/async_posix.c",
-        // "crypto/async/arch/async_win.c",
+        if (target.isWindows())
+            "crypto/async/arch/async_win.c"
+        else
+            "crypto/async/arch/async_posix.c",
         "crypto/async/async.c",
         "crypto/async/async_err.c",
         "crypto/async/async_wait.c",
@@ -200,9 +223,7 @@ fn libcrypto(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin.O
         "crypto/bn/bn_rand.c",
         "crypto/bn/bn_recp.c",
         "crypto/bn/bn_rsa_fips186_4.c",
-        // "crypto/bn/bn_s390x.c",
         "crypto/bn/bn_shift.c",
-        // "crypto/bn/bn_sparc.c",
         "crypto/bn/bn_sqr.c",
         "crypto/bn/bn_sqrt.c",
         "crypto/bn/bn_srp.c",
@@ -395,12 +416,10 @@ fn libcrypto(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin.O
         // "crypto/ec/ecp_nistz256_table.c",
         "crypto/ec/ecp_oct.c",
         "crypto/ec/ecp_ppc.c",
-        // "crypto/ec/ecp_s390x_nistp.c",
         "crypto/ec/ecp_smpl.c",
         "crypto/ec/ecx_backend.c",
         "crypto/ec/ecx_key.c",
         "crypto/ec/ecx_meth.c",
-        // "crypto/ec/ecx_s390x.c",
         "crypto/encode_decode/decoder_err.c",
         "crypto/encode_decode/decoder_lib.c",
         "crypto/encode_decode/decoder_meth.c",
@@ -638,7 +657,6 @@ fn libcrypto(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin.O
         // "crypto/poly1305/poly1305_base2_44.c",
         // "crypto/poly1305/poly1305_ieee754.c",
         "crypto/poly1305/poly1305_ppc.c",
-        // "crypto/ppccap.c",
         "crypto/property/defn_cache.c",
         "crypto/property/property.c",
         "crypto/property/property_err.c",
@@ -674,7 +692,6 @@ fn libcrypto(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin.O
         // "crypto/rc5/rc5ofb64.c",
         "crypto/ripemd/rmd_dgst.c",
         "crypto/ripemd/rmd_one.c",
-        // "crypto/riscvcap.c",
         // "crypto/rsa/rsa_acvp_test_params.c",
         "crypto/rsa/rsa_ameth.c",
         "crypto/rsa/rsa_asn1.c",
@@ -702,7 +719,6 @@ fn libcrypto(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin.O
         "crypto/rsa/rsa_sp800_56b_gen.c",
         "crypto/rsa/rsa_x931.c",
         "crypto/rsa/rsa_x931g.c",
-        // "crypto/s390xcap.c",
         "crypto/seed/seed.c",
         "crypto/seed/seed_cbc.c",
         "crypto/seed/seed_cfb.c",
@@ -725,7 +741,6 @@ fn libcrypto(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin.O
         "crypto/sm3/legacy_sm3.c",
         "crypto/sm3/sm3.c",
         "crypto/sm4/sm4.c",
-        // "crypto/sparcv9cap.c",
         "crypto/sparse_array.c",
         "crypto/srp/srp_lib.c",
         "crypto/srp/srp_vfy.c",
@@ -740,13 +755,17 @@ fn libcrypto(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin.O
         "crypto/thread/api.c",
         "crypto/thread/arch.c",
         "crypto/thread/arch/thread_none.c",
-        "crypto/thread/arch/thread_posix.c",
-        // "crypto/thread/arch/thread_win.c",
+        if (target.isWindows())
+            "crypto/thread/arch/thread_win.c"
+        else
+            "crypto/thread/arch/thread_posix.c",
         // "crypto/thread/internal.c",
         "crypto/threads_lib.c",
         "crypto/threads_none.c",
-        "crypto/threads_pthread.c",
-        // "crypto/threads_win.c",
+        if (target.isWindows())
+            "crypto/threads_win.c"
+        else
+            "crypto/threads_pthread.c",
         "crypto/time.c",
         "crypto/trace.c",
         "crypto/ts/ts_asn1.c",
@@ -976,6 +995,7 @@ fn libprovider(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin
     lib.addIncludePath(.{ .path = "providers/fips" });
     lib.addIncludePath(.{ .path = "providers/implementations/include" });
     lib.addIncludePath(.{ .path = "include_gen" });
+    lib.addIncludePath(.{ .path = "crypto" });
     lib.defineCMacro("OPENSSL_NO_DEPRECATED", null);
     lib.defineCMacro("OPENSSL_NO_ENGINE", null);
     lib.defineCMacro("OPENSSL_NO_SRP", null);
@@ -984,6 +1004,7 @@ fn libprovider(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin
     lib.defineCMacro("OPENSSL_NO_ASM", null);
     lib.defineCMacro("OPENSSL_NO_KTLS", null);
     lib.defineCMacro("OPENSSL_NO_QUIC", null);
+    lib.defineCMacro("OPENSSL_CPUID_OBJ", null);
     if (t.isDarwin()) {
         // CommonCrypto
         lib.linkFramework("CoreServices");
@@ -992,6 +1013,15 @@ fn libprovider(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin
     }
     if (t.isMinGW())
         lib.defineCMacro("NOCRYPT", "1");
+    lib.addCSourceFiles(switch (target.getCpuArch()) {
+        .x86, .x86_64 => &.{
+            "providers/implementations/rands/seeding/rand_cpu_x86.c",
+        },
+        .aarch64, .aarch64_32 => &.{
+            "providers/implementations/rands/seeding/rand_cpu_arm64.c",
+        },
+        else => &.{},
+    }, cflags);
     lib.addCSourceFiles(&.{
         "include_gen/der/der_sm2_gen.c",
         "include_gen/der/der_digests_gen.c",
@@ -1174,13 +1204,13 @@ fn libprovider(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin
         "providers/implementations/rands/drbg_hash.c",
         "providers/implementations/rands/drbg_hmac.c",
         "providers/implementations/rands/seed_src.c",
-        // "providers/implementations/rands/seeding/rand_cpu_arm64.c",
-        "providers/implementations/rands/seeding/rand_cpu_x86.c",
         "providers/implementations/rands/seeding/rand_tsc.c",
-        "providers/implementations/rands/seeding/rand_unix.c",
+        if (target.isWindows())
+            "providers/implementations/rands/seeding/rand_win.c"
+        else
+            "providers/implementations/rands/seeding/rand_unix.c",
         // "providers/implementations/rands/seeding/rand_vms.c",
         // "providers/implementations/rands/seeding/rand_vxworks.c",
-        // "providers/implementations/rands/seeding/rand_win.c",
         "providers/implementations/rands/test_rng.c",
         "providers/implementations/signature/dsa_sig.c",
         "providers/implementations/signature/ecdsa_sig.c",
