@@ -2163,16 +2163,6 @@ typedef struct ssl3_enc_method {
  */
 # define SSL_ENC_FLAG_TLS1_2_CIPHERS     0x10
 
-# ifndef OPENSSL_NO_COMP
-/* Used for holding the relevant compression methods loaded into SSL_CTX */
-typedef struct ssl3_comp_st {
-    int comp_id;                /* The identifier byte for this compression
-                                 * type */
-    char *name;                 /* Text name used for the compression type */
-    COMP_METHOD *method;        /* The method :-) */
-} SSL3_COMP;
-# endif
-
 typedef enum downgrade_en {
     DOWNGRADE_NONE,
     DOWNGRADE_TO_1_2,
@@ -2998,6 +2988,8 @@ size_t ossl_calculate_comp_expansion(int alg, size_t length);
 void ossl_ssl_set_custom_record_layer(SSL_CONNECTION *s,
                                       const OSSL_RECORD_METHOD *meth,
                                       void *rlarg);
+
+long ossl_ctrl_internal(SSL *s, int cmd, long larg, void *parg, int no_quic);
 
 /*
  * Options which no longer have any effect, but which can be implemented
