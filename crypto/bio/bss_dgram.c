@@ -1,5 +1,5 @@
 /*
- * Copyright 2005-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2005-2023 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -50,6 +50,17 @@
 # define M_METHOD_RECVFROM   3
 # define M_METHOD_WSARECVMSG 4
 
+# if defined(__GLIBC__) && defined(__GLIBC_PREREQ)
+#  if !(__GLIBC_PREREQ(2, 14))
+#   undef NO_RECVMMSG
+    /*
+     * Some old glibc versions may have recvmmsg and MSG_WAITFORONE flag, but
+     * not sendmmsg. We need both so force this to be disabled on these old
+     * versions
+     */
+#   define NO_RECVMMSG
+#  endif
+# endif
 # if !defined(M_METHOD)
 #  if defined(OPENSSL_SYS_WINDOWS) && defined(BIO_HAVE_WSAMSG) && !defined(NO_WSARECVMSG)
 #   define M_METHOD  M_METHOD_WSARECVMSG
@@ -722,6 +733,32 @@ static long dgram_ctrl(BIO *b, int cmd, long num, void *ptr)
     case BIO_CTRL_DGRAM_SET_PEER:
         BIO_ADDR_make(&data->peer, BIO_ADDR_sockaddr((BIO_ADDR *)ptr));
         break;
+    case BIO_CTRL_DGRAM_DETECT_PEER_ADDR:
+        {
+            BIO_ADDR xaddr, *p = &data->peer;
+            socklen_t xaddr_len = sizeof(xaddr.sa);
+
+            if (BIO_ADDR_family(p) == AF_UNSPEC) {
+                if (getpeername(b->num, (void *)&xaddr.sa, &xaddr_len) == 0
+                    && BIO_ADDR_family(&xaddr) != AF_UNSPEC) {
+                    p = &xaddr;
+                } else {
+                    ret = 0;
+                    break;
+                }
+            }
+
+            ret = BIO_ADDR_sockaddr_size(p);
+            if (num == 0 || num > ret)
+                num = ret;
+
+            memcpy(ptr, p, (ret = num));
+        }
+        break;
+    case BIO_C_SET_NBIO:
+        if (!BIO_socket_nbio(b->num, num != 0))
+            ret = 0;
+        break;
     case BIO_CTRL_DGRAM_SET_NEXT_TIMEOUT:
         data->next_timeout = ossl_time_from_timeval(*(struct timeval *)ptr);
         break;
@@ -943,6 +980,13 @@ static long dgram_ctrl(BIO *b, int cmd, long num, void *ptr)
 
     case BIO_CTRL_DGRAM_GET_LOCAL_ADDR_ENABLE:
         *(int *)ptr = data->local_addr_enabled;
+        break;
+
+    case BIO_CTRL_DGRAM_GET_EFFECTIVE_CAPS:
+        ret = (long)(BIO_DGRAM_CAP_HANDLES_DST_ADDR
+                     | BIO_DGRAM_CAP_HANDLES_SRC_ADDR
+                     | BIO_DGRAM_CAP_PROVIDES_DST_ADDR
+                     | BIO_DGRAM_CAP_PROVIDES_SRC_ADDR);
         break;
 
     case BIO_CTRL_GET_RPOLL_DESCRIPTOR:

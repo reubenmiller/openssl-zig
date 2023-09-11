@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2022-2023 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -61,6 +61,13 @@ int qtest_supports_blocking(void);
  * server.
  */
 int qtest_create_quic_connection(QUIC_TSERVER *qtserv, SSL *clientssl);
+
+/*
+ * Same as qtest_create_quic_connection but will stop (successfully) if the
+ * clientssl indicates SSL_ERROR_WANT_XXX as specified by |wanterr|
+ */
+int qtest_create_quic_connection_ex(QUIC_TSERVER *qtserv, SSL *clientssl,
+                                    int wanterr);
 
 /*
  * Shutdown the client SSL object gracefully

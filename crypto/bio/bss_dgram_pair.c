@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2022-2023 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -695,7 +695,7 @@ static long dgram_mem_ctrl(BIO *bio, int cmd, long num, void *ptr)
 
     /* BIO_dgram_get_local_addr_enable */
     case BIO_CTRL_DGRAM_GET_LOCAL_ADDR_ENABLE: /* Non-threadsafe */
-        ret = (long)dgram_pair_ctrl_get_local_addr_enable(bio);
+        *(int *)ptr = (int)dgram_pair_ctrl_get_local_addr_enable(bio);
         break;
 
     /* BIO_dgram_set_local_addr_enable */
