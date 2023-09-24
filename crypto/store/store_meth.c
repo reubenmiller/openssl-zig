@@ -219,6 +219,14 @@ static void *loader_from_algorithm(int scheme_id, const OSSL_ALGORITHM *algodef,
             if (loader->p_export_object == NULL)
                 loader->p_export_object = OSSL_FUNC_store_export_object(fns);
             break;
+        case OSSL_FUNC_STORE_DELETE:
+            if (loader->p_delete == NULL)
+                loader->p_delete = OSSL_FUNC_store_delete(fns);
+            break;
+        case OSSL_FUNC_STORE_OPEN_EX:
+            if (loader->p_open_ex == NULL)
+                loader->p_open_ex = OSSL_FUNC_store_open_ex(fns);
+            break;
         }
     }
 
@@ -226,7 +234,7 @@ static void *loader_from_algorithm(int scheme_id, const OSSL_ALGORITHM *algodef,
         || loader->p_load == NULL
         || loader->p_eof == NULL
         || loader->p_close == NULL) {
-        /* Only set_ctx_params is optionaal */
+        /* Only set_ctx_params is optional */
         OSSL_STORE_LOADER_free(loader);
         ERR_raise(ERR_LIB_OSSL_STORE, OSSL_STORE_R_LOADER_INCOMPLETE);
         return NULL;

@@ -936,6 +936,8 @@ OSSL_CORE_MAKE_FUNC(int, decoder_export_object,
 #define OSSL_FUNC_STORE_EOF                         6
 #define OSSL_FUNC_STORE_CLOSE                       7
 #define OSSL_FUNC_STORE_EXPORT_OBJECT               8
+#define OSSL_FUNC_STORE_DELETE                      9
+#define OSSL_FUNC_STORE_OPEN_EX                     10
 OSSL_CORE_MAKE_FUNC(void *, store_open, (void *provctx, const char *uri))
 OSSL_CORE_MAKE_FUNC(void *, store_attach, (void *provctx, OSSL_CORE_BIO *in))
 OSSL_CORE_MAKE_FUNC(const OSSL_PARAM *, store_settable_ctx_params,
@@ -951,6 +953,12 @@ OSSL_CORE_MAKE_FUNC(int, store_close, (void *loaderctx))
 OSSL_CORE_MAKE_FUNC(int, store_export_object,
                     (void *loaderctx, const void *objref, size_t objref_sz,
                      OSSL_CALLBACK *export_cb, void *export_cbarg))
+OSSL_CORE_MAKE_FUNC(int, store_delete,
+                    (void *provctx, const char *uri, const OSSL_PARAM params[],
+                     OSSL_PASSPHRASE_CALLBACK *pw_cb, void *pw_cbarg))
+OSSL_CORE_MAKE_FUNC(void *, store_open_ex,
+                    (void *provctx, const char *uri, const OSSL_PARAM params[],
+                     OSSL_PASSPHRASE_CALLBACK *pw_cb, void *pw_cbarg))
 
 # ifdef __cplusplus
 }

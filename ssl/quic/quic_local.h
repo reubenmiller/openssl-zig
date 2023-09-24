@@ -69,7 +69,7 @@ struct quic_xso_st {
      *         b2 must equal b1 (validated unless ACCEPT_MOVING_WRITE_BUFFER)
      *         l2 must equal l1 (always validated)
      *         append into sstream from [b2 + aon_buf_pos, b2 + aon_buf_len)
-     *         if done, aon_write_in_progess=0
+     *         if done, aon_write_in_progress=0
      *
      */
     /* Is an AON write in progress? */
@@ -321,7 +321,7 @@ const SSL_METHOD *func_name(void)  \
                 NULL /* dispatch_alert */, \
                 ossl_quic_ctrl, \
                 ossl_quic_ctx_ctrl, \
-                NULL /* get_cipher_by_char */, \
+                ossl_quic_get_cipher_by_char, \
                 NULL /* put_cipher_by_char */, \
                 ossl_quic_pending, \
                 ossl_quic_num_ciphers, \

@@ -99,10 +99,12 @@ QUIC_TSERVER *ossl_quic_tserver_new(const QUIC_TSERVER_ARGS *args,
     if (srv->ctx == NULL)
         goto err;
 
-    if (SSL_CTX_use_certificate_file(srv->ctx, certfile, SSL_FILETYPE_PEM) <= 0)
+    if (certfile != NULL
+            && SSL_CTX_use_certificate_file(srv->ctx, certfile, SSL_FILETYPE_PEM) <= 0)
         goto err;
 
-    if (SSL_CTX_use_PrivateKey_file(srv->ctx, keyfile, SSL_FILETYPE_PEM) <= 0)
+    if (keyfile != NULL
+            && SSL_CTX_use_PrivateKey_file(srv->ctx, keyfile, SSL_FILETYPE_PEM) <= 0)
         goto err;
 
     SSL_CTX_set_alpn_select_cb(srv->ctx, alpn_select_cb, srv);
@@ -157,8 +159,8 @@ void ossl_quic_tserver_free(QUIC_TSERVER *srv)
         return;
 
     ossl_quic_channel_free(srv->ch);
-    BIO_free(srv->args.net_rbio);
-    BIO_free(srv->args.net_wbio);
+    BIO_free_all(srv->args.net_rbio);
+    BIO_free_all(srv->args.net_wbio);
     OPENSSL_free(srv->ssl);
     SSL_free(srv->tls);
     SSL_CTX_free(srv->ctx);
@@ -555,4 +557,10 @@ int ossl_quic_tserver_set_max_early_data(QUIC_TSERVER *srv,
                                          uint32_t max_early_data)
 {
     return SSL_set_max_early_data(srv->tls, max_early_data);
+}
+
+void ossl_quic_tserver_set_psk_find_session_cb(QUIC_TSERVER *srv,
+                                               SSL_psk_find_session_cb_func cb)
+{
+    SSL_set_psk_find_session_callback(srv->tls, cb);
 }

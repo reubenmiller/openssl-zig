@@ -746,10 +746,8 @@ static int helper_init(struct helper *h, int free_order, int blocking,
         BIO_set_data(h->s_qtf_wbio, h->qtf);
     }
 
-    if (!need_injector)
-        h->s_net_bio_own = NULL;
-
-    h->s_qtf_wbio_own   = NULL;
+    h->s_net_bio_own = NULL;
+    h->s_qtf_wbio_own = NULL;
 
     h->c_fd = BIO_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, 0);
     if (!TEST_int_ge(h->c_fd, 0))
@@ -4329,7 +4327,7 @@ static int script_61_inject_plain(struct helper *h, QUIC_PKT_HDR *hdr,
         || !TEST_true(WPACKET_quic_write_vlint(&wpkt, /* stream ID */
                                                h->inject_word1))
         || !TEST_true(WPACKET_quic_write_vlint(&wpkt, 123))
-        || (h->inject_word1 == OSSL_QUIC_FRAME_TYPE_RESET_STREAM
+        || (h->inject_word0 == OSSL_QUIC_FRAME_TYPE_RESET_STREAM
            && !TEST_true(WPACKET_quic_write_vlint(&wpkt, 0)))) /* final size */
         goto err;
 

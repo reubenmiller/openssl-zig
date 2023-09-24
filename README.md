@@ -4,6 +4,7 @@ Welcome to the OpenSSL Project (Forked to zig-pkg support)
 [![openssl logo]][www.openssl.org]
 
 [![Zig Build](https://github.com/kassane/openssl/actions/workflows/zig.yml/badge.svg)](https://github.com/kassane/openssl/actions/workflows/zig.yml)
+[![Zig Embedded](https://github.com/kassane/openssl/actions/workflows/zig-embedded.yml/badge.svg)](https://github.com/kassane/openssl/actions/workflows/zig-embedded.yml)
 
 OpenSSL is a robust, commercial-grade, full-featured Open Source Toolkit
 for the Transport Layer Security (TLS) protocol formerly known as the
