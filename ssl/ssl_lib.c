@@ -2908,6 +2908,9 @@ long ossl_ctrl_internal(SSL *s, int cmd, long larg, void *parg, int no_quic)
     long l;
     SSL_CONNECTION *sc = SSL_CONNECTION_FROM_SSL(s);
 
+    if (sc == NULL)
+        return 0;
+
     /*
      * Routing of ctrl calls for QUIC is a little counterintuitive:
      *
@@ -5142,7 +5145,7 @@ void SSL_set_quiet_shutdown(SSL *s, int mode)
 {
     SSL_CONNECTION *sc = SSL_CONNECTION_FROM_SSL_ONLY(s);
 
-    /* TODO(QUIC): Currently not supported for QUIC. */
+    /* Not supported with QUIC */
     if (sc == NULL)
         return;
 
@@ -5153,7 +5156,7 @@ int SSL_get_quiet_shutdown(const SSL *s)
 {
     const SSL_CONNECTION *sc = SSL_CONNECTION_FROM_CONST_SSL_ONLY(s);
 
-    /* TODO(QUIC): Currently not supported for QUIC. */
+    /* Not supported with QUIC */
     if (sc == NULL)
         return 0;
 
@@ -5164,7 +5167,7 @@ void SSL_set_shutdown(SSL *s, int mode)
 {
     SSL_CONNECTION *sc = SSL_CONNECTION_FROM_SSL_ONLY(s);
 
-    /* TODO(QUIC): Do we want this for QUIC? */
+    /* Not supported with QUIC */
     if (sc == NULL)
         return;
 
@@ -5175,7 +5178,12 @@ int SSL_get_shutdown(const SSL *s)
 {
     const SSL_CONNECTION *sc = SSL_CONNECTION_FROM_CONST_SSL_ONLY(s);
 
-    /* TODO(QUIC): Do we want this for QUIC? */
+#ifndef OPENSSL_NO_QUIC
+    /* QUIC: Just indicate whether the connection was shutdown cleanly. */
+    if (IS_QUIC(s))
+        return ossl_quic_get_shutdown(s);
+#endif
+
     if (sc == NULL)
         return 0;
 
