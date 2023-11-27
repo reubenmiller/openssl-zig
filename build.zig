@@ -892,6 +892,7 @@ fn libssl(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin.Opti
     lib.defineCMacro("OPENSSL_NO_ASM", null);
     lib.defineCMacro("OPENSSL_NO_KTLS", null);
     lib.defineCMacro("OPENSSL_NO_QUIC", null);
+    lib.defineCMacro("OSSL_NELEM", null);
     if (t.isMinGW())
         lib.defineCMacro("NOCRYPT", "1");
     lib.addCSourceFiles(&.{
@@ -1005,6 +1006,7 @@ fn libprovider(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin
     lib.defineCMacro("OPENSSL_NO_KTLS", null);
     lib.defineCMacro("OPENSSL_NO_QUIC", null);
     lib.defineCMacro("OPENSSL_CPUID_OBJ", null);
+    lib.defineCMacro("OSSL_RAND_PARAM_GENERATE", null);
     if (t.isDarwin()) {
         // CommonCrypto
         lib.linkFramework("CoreServices");
