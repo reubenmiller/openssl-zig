@@ -597,7 +597,7 @@ int ASN1_TIME_compare(const ASN1_TIME *a, const ASN1_TIME *b)
 /*
  * tweak for Windows
  */
-#ifdef WIN32
+#if defined(WIN32) && !defined(__MINGW32__)
 # define timezone _timezone
 #endif
 
