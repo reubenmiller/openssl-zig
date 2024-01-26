@@ -1,5 +1,9 @@
 .{
     .name = "openssl",
-    .version = "3.2.0",
-    .paths = .{""},
+    .version = "3.3.0",
+    .paths = .{
+        "build.zig",
+        "LICENSE",
+        "README.md",
+    },
 }

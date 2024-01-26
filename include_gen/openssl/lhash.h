@@ -34,9 +34,13 @@ extern "C" {
 
 typedef struct lhash_node_st OPENSSL_LH_NODE;
 typedef int (*OPENSSL_LH_COMPFUNC) (const void *, const void *);
+typedef int (*OPENSSL_LH_COMPFUNCTHUNK) (const void *, const void *, OPENSSL_LH_COMPFUNC cfn);
 typedef unsigned long (*OPENSSL_LH_HASHFUNC) (const void *);
+typedef unsigned long (*OPENSSL_LH_HASHFUNCTHUNK) (const void *, OPENSSL_LH_HASHFUNC hfn);
 typedef void (*OPENSSL_LH_DOALL_FUNC) (void *);
+typedef void (*OPENSSL_LH_DOALL_FUNC_THUNK) (void *, OPENSSL_LH_DOALL_FUNC doall);
 typedef void (*OPENSSL_LH_DOALL_FUNCARG) (void *, void *);
+typedef void (*OPENSSL_LH_DOALL_FUNCARG_THUNK) (void *, void *, OPENSSL_LH_DOALL_FUNCARG doall);
 typedef struct lhash_st OPENSSL_LHASH;
 
 /*

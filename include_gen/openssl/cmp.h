@@ -412,6 +412,7 @@ const char *OSSL_CMP_CTX_get0_propq(const OSSL_CMP_CTX *ctx);
 #  define OSSL_CMP_OPT_DIGEST_ALGNID 34
 #  define OSSL_CMP_OPT_IGNORE_KEYUSAGE 35
 #  define OSSL_CMP_OPT_PERMIT_TA_IN_EXTRACERTS_FOR_IR 36
+#  define OSSL_CMP_OPT_NO_CACHE_EXTRACERTS 37
 int OSSL_CMP_CTX_set_option(OSSL_CMP_CTX *ctx, int opt, int val);
 int OSSL_CMP_CTX_get_option(const OSSL_CMP_CTX *ctx, int opt);
 /* CMP-specific callback for logging and outputting the error queue: */
@@ -569,6 +570,13 @@ int OSSL_CMP_SRV_CTX_init(OSSL_CMP_SRV_CTX *srv_ctx, void *custom_ctx,
                           OSSL_CMP_SRV_error_cb_t process_error,
                           OSSL_CMP_SRV_certConf_cb_t process_certConf,
                           OSSL_CMP_SRV_pollReq_cb_t process_pollReq);
+typedef int (*OSSL_CMP_SRV_delayed_delivery_cb_t)(OSSL_CMP_SRV_CTX *srv_ctx,
+                                                  const OSSL_CMP_MSG *req);
+typedef int (*OSSL_CMP_SRV_clean_transaction_cb_t)(OSSL_CMP_SRV_CTX *srv_ctx,
+                                                   const ASN1_OCTET_STRING *id);
+int OSSL_CMP_SRV_CTX_init_trans(OSSL_CMP_SRV_CTX *srv_ctx,
+                                OSSL_CMP_SRV_delayed_delivery_cb_t delay,
+                                OSSL_CMP_SRV_clean_transaction_cb_t clean);
 OSSL_CMP_CTX *OSSL_CMP_SRV_CTX_get0_cmp_ctx(const OSSL_CMP_SRV_CTX *srv_ctx);
 void *OSSL_CMP_SRV_CTX_get0_custom_ctx(const OSSL_CMP_SRV_CTX *srv_ctx);
 int OSSL_CMP_SRV_CTX_set_send_unprotected_errors(OSSL_CMP_SRV_CTX *srv_ctx,
