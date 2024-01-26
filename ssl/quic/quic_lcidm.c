@@ -136,6 +136,25 @@ void ossl_quic_lcidm_free(QUIC_LCIDM *lcidm)
     if (lcidm == NULL)
         return;
 
+    /*
+     * Calling OPENSSL_lh_delete during a doall call is unsafe with our
+     * current LHASH implementation for several reasons:
+     *
+     * - firstly, because deletes can cause the hashtable to be contracted,
+     *   resulting in rehashing which might cause items in later buckets to
+     *   move to earlier buckets, which might cause doall to skip an item,
+     *   resulting in a memory leak;
+     *
+     * - secondly, because doall in general is not safe across hashtable
+     *   size changes, as it caches hashtable size and pointer values
+     *   while operating.
+     *
+     * The fix for this is to disable hashtable contraction using the following
+     * call, which guarantees that no rehashing will occur so long as we only
+     * call delete and not insert.
+     */
+    lh_QUIC_LCIDM_CONN_set_down_load(lcidm->conns, 0);
+
     lh_QUIC_LCIDM_CONN_doall_arg(lcidm->conns, lcidm_delete_conn_, lcidm);
 
     lh_QUIC_LCID_free(lcidm->lcids);
@@ -210,6 +229,9 @@ static void lcidm_delete_conn_lcid_(QUIC_LCID *lcid_obj, void *arg)
 
 static void lcidm_delete_conn(QUIC_LCIDM *lcidm, QUIC_LCIDM_CONN *conn)
 {
+    /* See comment in ossl_quic_lcidm_free */
+    lh_QUIC_LCID_set_down_load(conn->lcids, 0);
+
     lh_QUIC_LCID_doall_arg(conn->lcids, lcidm_delete_conn_lcid_, lcidm);
     lh_QUIC_LCIDM_CONN_delete(lcidm->conns, conn);
     lh_QUIC_LCID_free(conn->lcids);
@@ -265,26 +287,6 @@ size_t ossl_quic_lcidm_get_num_active_lcid(const QUIC_LCIDM *lcidm,
     return conn->num_active_lcid;
 }
 
-#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-
-static int gen_rand_conn_id(OSSL_LIB_CTX *libctx, size_t len, QUIC_CONN_ID *cid)
-{
-    if (len > QUIC_MAX_CONN_ID_LEN)
-        return 0;
-
-    cid->id_len = (unsigned char)len;
-
-    if (RAND_bytes_ex(libctx, cid->id, len, len * 8) != 1) {
-        ERR_raise(ERR_LIB_SSL, ERR_R_RAND_LIB);
-        cid->id_len = 0;
-        return 0;
-    }
-
-    return 1;
-}
-
-#endif
-
 static int lcidm_generate_cid(QUIC_LCIDM *lcidm,
                               QUIC_CONN_ID *cid)
 {
@@ -300,7 +302,7 @@ static int lcidm_generate_cid(QUIC_LCIDM *lcidm,
 
     return 1;
 #else
-    return gen_rand_conn_id(lcidm->libctx, lcidm->lcid_len, cid);
+    return ossl_quic_gen_rand_conn_id(lcidm->libctx, lcidm->lcid_len, cid);
 #endif
 }
 
@@ -460,6 +462,7 @@ int ossl_quic_lcidm_retire(QUIC_LCIDM *lcidm,
 
     args.retire_prior_to    = retire_prior_to;
     args.earliest_seq_num   = UINT64_MAX;
+
     lh_QUIC_LCID_doall_arg(conn->lcids, retire_for_conn, &args);
     if (args.earliest_seq_num_lcid_obj == NULL)
         return 1;

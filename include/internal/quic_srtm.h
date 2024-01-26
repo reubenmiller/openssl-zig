@@ -15,6 +15,7 @@
 # include "internal/time.h"
 # include "internal/quic_types.h"
 # include "internal/quic_wire.h"
+# include "internal/quic_predef.h"
 
 # ifndef OPENSSL_NO_QUIC
 
@@ -25,7 +26,7 @@
  * The stateless reset token manager is responsible for mapping stateless reset
  * tokens to connections. It is used to identify stateless reset tokens in
  * incoming packets. In this regard it can be considered an alternate "routing"
- * mechanism for incoming packets, and is somewhat analagous with the LCIDM,
+ * mechanism for incoming packets, and is somewhat analogous with the LCIDM,
  * except that it uses SRTs to route rather than DCIDs.
  *
  * The SRTM specifically stores a bidirectional mapping of the form
@@ -53,7 +54,6 @@
  * The opaque pointer may be used for any purpose but is intended to represent a
  * connection identity and must therefore be consistent (usefully comparable).
  */
-typedef struct quic_srtm_st QUIC_SRTM;
 
 /* Creates a new empty SRTM instance. */
 QUIC_SRTM *ossl_quic_srtm_new(OSSL_LIB_CTX *libctx, const char *propq);

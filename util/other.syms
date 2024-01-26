@@ -113,6 +113,7 @@ UI_METHOD                               datatype
 UI_STRING                               datatype
 UI_string_types                         datatype
 UI_string_types                         datatype
+X509_ATTRIBUTE                          datatype
 X509_STORE_CTX_cert_crl_fn              datatype
 X509_STORE_CTX_check_crl_fn             datatype
 X509_STORE_CTX_check_issued_fn          datatype
@@ -461,6 +462,8 @@ OSSL_CMP_SRV_certConf_cb_t              datatype
 OSSL_CMP_SRV_genm_cb_t                  datatype
 OSSL_CMP_SRV_error_cb_t                 datatype
 OSSL_CMP_SRV_pollReq_cb_t               datatype
+OSSL_CMP_SRV_delayed_delivery_cb_t      datatype
+OSSL_CMP_SRV_clean_transaction_cb_t     datatype
 OSSL_CORE_MAKE_FUNC                     define
 OSSL_PARAM_TYPE                         define
 OSSL_PARAM_octet_ptr                    define
@@ -673,6 +676,7 @@ SSL_DEFAULT_STREAM_MODE_NONE            define
 SSL_INCOMING_STREAM_POLICY_ACCEPT       define
 SSL_INCOMING_STREAM_POLICY_AUTO         define
 SSL_INCOMING_STREAM_POLICY_REJECT       define
+SSL_WRITE_FLAG_CONCLUDE                 define
 TLS_DEFAULT_CIPHERSUITES                define deprecated 3.0.0
 X509_CRL_http_nbio                      define deprecated 3.0.0
 X509_http_nbio                          define deprecated 3.0.0

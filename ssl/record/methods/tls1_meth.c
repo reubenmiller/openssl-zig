@@ -117,9 +117,16 @@ static int tls1_set_crypto_state(OSSL_RECORD_LAYER *rl, int level,
         ERR_raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR);
         return OSSL_RECORD_RETURN_FATAL;
     }
-    if (EVP_CIPHER_get0_provider(ciph) != NULL
-            && !ossl_set_tls_provider_parameters(rl, ciph_ctx, ciph, md))
+
+    /*
+     * The cipher we actually ended up using in the EVP_CIPHER_CTX may be
+     * different to that in ciph if we have an ENGINE in use
+     */
+    if (EVP_CIPHER_get0_provider(EVP_CIPHER_CTX_get0_cipher(ciph_ctx)) != NULL
+            && !ossl_set_tls_provider_parameters(rl, ciph_ctx, ciph, md)) {
+        /* ERR_raise already called */
         return OSSL_RECORD_RETURN_FATAL;
+    }
 
     /* Calculate the explicit IV length */
     if (RLAYER_USE_EXPLICIT_IV(rl)) {
@@ -221,6 +228,11 @@ static int tls1_cipher(OSSL_RECORD_LAYER *rl, TLS_RL_RECORD *recs,
     provided = (EVP_CIPHER_get0_provider(enc) != NULL);
 
     bs = EVP_CIPHER_get_block_size(EVP_CIPHER_CTX_get0_cipher(ds));
+
+    if (bs == 0) {
+        RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, SSL_R_BAD_CIPHER);
+        return 0;
+    }
 
     if (n_recs > 1) {
         if ((EVP_CIPHER_get_flags(EVP_CIPHER_CTX_get0_cipher(ds))

@@ -1131,7 +1131,7 @@ static int cipher_test_run(EVP_TEST *t)
         t->err = "NO_KEY";
         return 0;
     }
-    if (!cdat->iv && EVP_CIPHER_get_iv_length(cdat->cipher)) {
+    if (!cdat->iv && EVP_CIPHER_get_iv_length(cdat->cipher) > 0) {
         /* IV is optional and usually omitted in wrap mode */
         if (EVP_CIPHER_get_mode(cdat->cipher) != EVP_CIPH_WRAP_MODE) {
             t->err = "NO_IV";
@@ -1514,7 +1514,7 @@ static int mac_test_run_mac(EVP_TEST *t)
     EVP_MAC_CTX *ctx = NULL;
     unsigned char *got = NULL;
     size_t got_len = 0, size = 0;
-    size_t size_before_init, size_after_init, size_val = 0;
+    size_t size_before_init = 0, size_after_init, size_val = 0;
     int i, block_size = -1, output_size = -1;
     OSSL_PARAM params[21], sizes[3], *psizes = sizes;
     size_t params_n = 0;
@@ -1622,7 +1622,8 @@ static int mac_test_run_mac(EVP_TEST *t)
         t->err = "MAC_CREATE_ERROR";
         goto err;
     }
-    size_before_init = EVP_MAC_CTX_get_mac_size(ctx);
+    if (fips_provider_version_gt(libctx, 3, 2, 0))
+        size_before_init = EVP_MAC_CTX_get_mac_size(ctx);
     if (!EVP_MAC_init(ctx, expected->key, expected->key_len, params)) {
         t->err = "MAC_INIT_ERROR";
         goto err;

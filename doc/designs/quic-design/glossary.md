@@ -25,8 +25,7 @@ limits on transmissions accordingly.
 the CFQ strategy for frame in flight management. For details, see FIFM
 design document.
 
-**Channel:** Core QUIC connection handling object and connection state machine
-implementation. This is fused tightly with the RXDP.
+**Channel:** See `QUIC_CHANNEL`.
 
 **CID:** Connection ID.
 
@@ -54,6 +53,8 @@ DCID.
 dispatches calls to libssl public APIs to the APL.
 
 **EL:** Encryption level. See RFC 9000.
+
+**Engine:** See `QUIC_ENGINE`.
 
 **FC:** Flow control. Comprises TXFC and RXFC.
 
@@ -127,12 +128,20 @@ in which API calls can be made on different threads.
 **MSST:** Multi-stream single-thread. Refers to a type of multi-stream QUIC
 usage in which API calls must not be made concurrently.
 
+**NCID:** New Connection ID. Refers to a QUIC `NEW_CONNECTION_ID` frame.
+
+**Numbered CID:** Refers to a Connection ID which has a sequence number assigned
+to it. All CIDs other than Initial ODCIDs and Retry ODCIDs have a sequence
+number assigned. See also Unnumbered CID.
+
 **ODCID:** Original Destination CID. This is the DCID found in the first Initial
 packet sent by a client, and is used to generate the secrets for encrypting
 Initial packets. It is only used temporarily.
 
 **PN:** Packet number. Most QUIC packet types have a packet number (PN); see RFC
 9000.
+
+**Port:** See `QUIC_PORT`.
 
 **PTO:** Probe timeout. See RFC 9000.
 
@@ -167,8 +176,24 @@ wrapping libssl TLS code to implement the QUIC-specific aspects of QUIC TLS.
 
 **QTX:** QUIC Record Layer TX. Encrypts and sends packets in datagrams.
 
+**QUIC_CHANNEL:** Internal object in the QUIC core implementation corresponding
+to a QUIC connection. Ties together other components and provides connection
+handling and state machine implementation. Belongs to a `QUIC_PORT` representing
+a UDP socket/BIO, which in turn belongs to a `QUIC_ENGINE`. Owns some number of
+`QUIC_STREAM` instances. The `QUIC_CHANNEL` code is fused tightly with the RXDP.
+
 **QUIC_CONNECTION:** QUIC connection. This is the object representing a QUIC
-connection in the APL.
+connection in the APL. It internally corresponds to a `QUIC_CHANNEL` object in
+the QUIC core implementation.
+
+**QUIC_ENGINE:** Internal object in the QUIC core implementation constituting
+the top-level object of a QUIC event and I/O processing domain. Owns zero or
+more `QUIC_PORT` instances, each of which owns zero or more `QUIC_CHANNEL`
+objects representing QUIC connections.
+
+**QUIC_PORT:** Internal object in the QUIC core implementation corresponding to
+a listening port/network BIO. Has zero or more child `QUIC_CHANNEL` objects
+associated with it and belongs to a `QUIC_ENGINE`.
 
 **QUIC_STREAM**: Internal object tracking a QUIC stream. Unlike an XSO this is
 not part of the APL. An XSO wraps a QUIC_STREAM once that stream is exposed as
@@ -176,7 +201,8 @@ an API object. As such, a `QUIC_CONNECTION` is to a `QUIC_CHANNEL` what a
 `QUIC_XSO` is to a `QUIC_STREAM`.
 
 **RCID:** Remote CID. Refers to a CID which has been provided to us by a peer
-and which we can place in the DCID field of an outgoing packet. See also LCID.
+and which we can place in the DCID field of an outgoing packet. See also LCID,
+Unnumbered CID and Numbered CID.
 
 **RCIDM:** Remote CID Manager. Tracks RCIDs which have been provided to us by a
 peer. See also LCIDM.
@@ -264,6 +290,12 @@ to a *send stream buffer*, and that data is eventually TX'd by the TXP and QTX.)
 
 **Uni:** Abbreviation of unidirectional, referring to a QUIC unidirectional
 stream.
+
+**Unnumbered CID:** Refers to a CID which does not have a sequence number
+associated with it and therefore cannot be referred to by a `NEW_CONNECTION_ID`
+or `RETIRE_CONNECTION_ID` frame's sequence number fields. The only unnumbered
+CIDs are Initial ODCIDs and Retry ODCIDs. These CIDs are exceptionally retired
+automatically during handshake confirmation. See also Numbered CID.
 
 **URXE:** Unprocessed RX entry. Structure containing yet-undecrypted received
 datagrams pending processing. Stored in a queue known as the URXL.

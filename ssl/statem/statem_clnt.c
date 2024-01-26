@@ -871,20 +871,16 @@ WORK_STATE ossl_statem_client_post_work(SSL_CONNECTION *s, WORK_STATE wst)
             return WORK_ERROR;
         }
 
-        if (SSL_CONNECTION_IS_DTLS(s)) {
 #ifndef OPENSSL_NO_SCTP
-            if (s->hit) {
-                /*
-                 * Change to new shared key of SCTP-Auth, will be ignored if
-                 * no SCTP used.
-                 */
-                BIO_ctrl(SSL_get_wbio(ssl), BIO_CTRL_DGRAM_SCTP_NEXT_AUTH_KEY,
-                         0, NULL);
-            }
-#endif
-
-            dtls1_increment_epoch(s, SSL3_CC_WRITE);
+        if (SSL_CONNECTION_IS_DTLS(s) && s->hit) {
+            /*
+            * Change to new shared key of SCTP-Auth, will be ignored if
+            * no SCTP used.
+            */
+            BIO_ctrl(SSL_get_wbio(ssl), BIO_CTRL_DGRAM_SCTP_NEXT_AUTH_KEY,
+                     0, NULL);
         }
+#endif
         break;
 
     case TLS_ST_CW_FINISHED:
@@ -4119,15 +4115,12 @@ int ssl_cipher_list_to_bytes(SSL_CONNECTION *s, STACK_OF(SSL_CIPHER) *sk,
 
         /* Sanity check that the maximum version we offer has ciphers enabled */
         if (!maxverok) {
-            if (SSL_CONNECTION_IS_DTLS(s)) {
-                if (DTLS_VERSION_GE(c->max_dtls, s->s3.tmp.max_ver)
-                        && DTLS_VERSION_LE(c->min_dtls, s->s3.tmp.max_ver))
-                    maxverok = 1;
-            } else {
-                if (c->max_tls >= s->s3.tmp.max_ver
-                        && c->min_tls <= s->s3.tmp.max_ver)
-                    maxverok = 1;
-            }
+            int minproto = SSL_CONNECTION_IS_DTLS(s) ? c->min_dtls : c->min_tls;
+            int maxproto = SSL_CONNECTION_IS_DTLS(s) ? c->max_dtls : c->max_tls;
+
+            if (ssl_version_cmp(s, maxproto, s->s3.tmp.max_ver) >= 0
+                    && ssl_version_cmp(s, minproto, s->s3.tmp.max_ver) <= 0)
+                maxverok = 1;
         }
 
         totlen += len;
