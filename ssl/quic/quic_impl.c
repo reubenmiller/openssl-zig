@@ -453,7 +453,7 @@ SSL *ossl_quic_new(SSL_CTX *ctx)
 err:
     if (ssl_base == NULL) {
 #if defined(OPENSSL_THREADS)
-        ossl_crypto_mutex_free(qc->mutex);
+        ossl_crypto_mutex_free(&qc->mutex);
 #endif
         OPENSSL_free(qc);
     } else {
@@ -544,6 +544,8 @@ void ossl_quic_free(SSL *s)
     }
 #endif
 
+    SSL_free(ctx.qc->tls);
+
     ossl_quic_channel_free(ctx.qc->ch);
     ossl_quic_port_free(ctx.qc->port);
     ossl_quic_engine_free(ctx.qc->engine);
@@ -551,13 +553,15 @@ void ossl_quic_free(SSL *s)
     BIO_free_all(ctx.qc->net_rbio);
     BIO_free_all(ctx.qc->net_wbio);
 
-    /* Note: SSL_free calls OPENSSL_free(qc) for us */
-
-    SSL_free(ctx.qc->tls);
     quic_unlock(ctx.qc); /* tsan doesn't like freeing locked mutexes */
 #if defined(OPENSSL_THREADS)
     ossl_crypto_mutex_free(&ctx.qc->mutex);
 #endif
+
+    /*
+     * Note: SSL_free (that called this function) calls OPENSSL_free(ctx.qc) for
+     * us
+     */
 }
 
 /* SSL method init */
@@ -2635,10 +2639,12 @@ static int quic_read_actual(QCTX *ctx,
     QUIC_CONNECTION *qc = ctx->qc;
 
     if (!quic_validate_for_read(ctx->xso, &err, &eos)) {
-        if (eos)
+        if (eos) {
+            ctx->xso->retired_fin = 1;
             return QUIC_RAISE_NORMAL_ERROR(ctx, SSL_ERROR_ZERO_RETURN);
-        else
+        } else {
             return QUIC_RAISE_NON_NORMAL_ERROR(ctx, err, NULL);
+        }
     }
 
     if (peek) {
@@ -2680,8 +2686,10 @@ static int quic_read_actual(QCTX *ctx,
                                               stream);
     }
 
-    if (*bytes_read == 0 && is_fin)
+    if (*bytes_read == 0 && is_fin) {
+        ctx->xso->retired_fin = 1;
         return QUIC_RAISE_NORMAL_ERROR(ctx, SSL_ERROR_ZERO_RETURN);
+    }
 
     return 1;
 }
@@ -3195,6 +3203,154 @@ int ossl_quic_set_incoming_stream_policy(SSL *s, int policy,
 }
 
 /*
+ * SSL_get_value, SSL_set_value
+ * ----------------------------
+ */
+QUIC_TAKES_LOCK
+static int qc_getset_idle_timeout(QCTX *ctx, uint32_t class_,
+                                  uint64_t *p_value_out, uint64_t *p_value_in)
+{
+    int ret = 0;
+    uint64_t value_out = 0, value_in;
+
+    quic_lock(ctx->qc);
+
+    switch (class_) {
+    case SSL_VALUE_CLASS_FEATURE_REQUEST:
+        value_out = ossl_quic_channel_get_max_idle_timeout_request(ctx->qc->ch);
+
+        if (p_value_in != NULL) {
+            value_in = *p_value_in;
+            if (value_in > OSSL_QUIC_VLINT_MAX) {
+                QUIC_RAISE_NON_NORMAL_ERROR(ctx, ERR_R_PASSED_INVALID_ARGUMENT,
+                                            NULL);
+                goto err;
+            }
+
+            if (ossl_quic_channel_have_generated_transport_params(ctx->qc->ch)) {
+                QUIC_RAISE_NON_NORMAL_ERROR(ctx, SSL_R_FEATURE_NOT_RENEGOTIABLE,
+                                            NULL);
+                goto err;
+            }
+
+            ossl_quic_channel_set_max_idle_timeout_request(ctx->qc->ch, value_in);
+        }
+        break;
+
+    case SSL_VALUE_CLASS_FEATURE_PEER_REQUEST:
+    case SSL_VALUE_CLASS_FEATURE_NEGOTIATED:
+        if (p_value_in != NULL) {
+            QUIC_RAISE_NON_NORMAL_ERROR(ctx, SSL_R_UNSUPPORTED_CONFIG_VALUE_OP,
+                                        NULL);
+            goto err;
+        }
+
+        if (!ossl_quic_channel_is_handshake_complete(ctx->qc->ch)) {
+            QUIC_RAISE_NON_NORMAL_ERROR(ctx, SSL_R_FEATURE_NEGOTIATION_NOT_COMPLETE,
+                                        NULL);
+            goto err;
+        }
+
+        value_out = (class_ == SSL_VALUE_CLASS_FEATURE_NEGOTIATED)
+            ? ossl_quic_channel_get_max_idle_timeout_actual(ctx->qc->ch)
+            : ossl_quic_channel_get_max_idle_timeout_peer_request(ctx->qc->ch);
+        break;
+
+    default:
+        QUIC_RAISE_NON_NORMAL_ERROR(ctx, SSL_R_UNSUPPORTED_CONFIG_VALUE_CLASS,
+                                    NULL);
+        goto err;
+    }
+
+    ret = 1;
+err:
+    quic_unlock(ctx->qc);
+    if (ret && p_value_out != NULL)
+        *p_value_out = value_out;
+
+    return ret;
+}
+
+QUIC_TAKES_LOCK
+static int qc_get_stream_avail(QCTX *ctx, uint32_t class_,
+                               int is_uni, int is_remote,
+                               uint64_t *value)
+{
+    int ret = 0;
+
+    if (class_ != SSL_VALUE_CLASS_GENERIC) {
+        QUIC_RAISE_NON_NORMAL_ERROR(ctx, SSL_R_UNSUPPORTED_CONFIG_VALUE_CLASS,
+                                    NULL);
+        return 0;
+    }
+
+    quic_lock(ctx->qc);
+
+    *value = is_remote
+        ? ossl_quic_channel_get_remote_stream_count_avail(ctx->qc->ch, is_uni)
+        : ossl_quic_channel_get_local_stream_count_avail(ctx->qc->ch, is_uni);
+
+    ret = 1;
+    quic_unlock(ctx->qc);
+    return ret;
+}
+
+QUIC_TAKES_LOCK
+int ossl_quic_get_value_uint(SSL *s, uint32_t class_, uint32_t id,
+                             uint64_t *value)
+{
+    QCTX ctx;
+
+    if (!expect_quic_conn_only(s, &ctx))
+        return 0;
+
+    if (value == NULL)
+        return QUIC_RAISE_NON_NORMAL_ERROR(&ctx,
+                                           ERR_R_PASSED_INVALID_ARGUMENT, NULL);
+
+    switch (id) {
+    case SSL_VALUE_QUIC_IDLE_TIMEOUT:
+        return qc_getset_idle_timeout(&ctx, class_, value, NULL);
+
+    case SSL_VALUE_QUIC_STREAM_BIDI_LOCAL_AVAIL:
+        return qc_get_stream_avail(&ctx, class_, /*uni=*/0, /*remote=*/0, value);
+    case SSL_VALUE_QUIC_STREAM_BIDI_REMOTE_AVAIL:
+        return qc_get_stream_avail(&ctx, class_, /*uni=*/0, /*remote=*/1, value);
+    case SSL_VALUE_QUIC_STREAM_UNI_LOCAL_AVAIL:
+        return qc_get_stream_avail(&ctx, class_, /*uni=*/1, /*remote=*/0, value);
+    case SSL_VALUE_QUIC_STREAM_UNI_REMOTE_AVAIL:
+        return qc_get_stream_avail(&ctx, class_, /*uni=*/1, /*remote=*/1, value);
+
+    default:
+        return QUIC_RAISE_NON_NORMAL_ERROR(&ctx,
+                                           SSL_R_UNSUPPORTED_CONFIG_VALUE, NULL);
+    }
+
+    return 1;
+}
+
+QUIC_TAKES_LOCK
+int ossl_quic_set_value_uint(SSL *s, uint32_t class_, uint32_t id,
+                             uint64_t value)
+{
+    QCTX ctx;
+
+    if (!expect_quic_conn_only(s, &ctx))
+        return 0;
+
+    switch (id) {
+    case SSL_VALUE_QUIC_IDLE_TIMEOUT:
+        return qc_getset_idle_timeout(&ctx, class_, NULL, &value);
+
+    default:
+        return QUIC_RAISE_NON_NORMAL_ERROR(&ctx,
+                                           SSL_R_UNSUPPORTED_CONFIG_VALUE, NULL);
+    }
+
+    return 1;
+}
+
+/*
  * SSL_accept_stream
  * -----------------
  */
@@ -3302,7 +3458,7 @@ size_t ossl_quic_get_accept_stream_queue_len(SSL *s)
 
     quic_lock(ctx.qc);
 
-    v = ossl_quic_stream_map_get_accept_queue_len(ossl_quic_channel_get_qsm(ctx.qc->ch));
+    v = ossl_quic_stream_map_get_total_accept_queue_len(ossl_quic_channel_get_qsm(ctx.qc->ch));
 
     quic_unlock(ctx.qc);
     return v;
@@ -3335,6 +3491,8 @@ int ossl_quic_stream_reset(SSL *ssl,
     }
 
     ok = ossl_quic_stream_map_reset_stream_send_part(qsm, qs, error_code);
+    if (ok)
+        ctx.xso->requested_reset = 1;
 
 err:
     quic_unlock(ctx.qc);
@@ -3685,6 +3843,150 @@ int ossl_quic_get_shutdown(const SSL *s)
 }
 
 /*
+ * QUIC Polling Support APIs
+ * =========================
+ */
+
+/* Do we have the R (read) condition? */
+QUIC_NEEDS_LOCK
+static int test_poll_event_r(QUIC_XSO *xso)
+{
+    int fin = 0;
+    size_t avail = 0;
+
+    return ossl_quic_stream_has_recv_buffer(xso->stream)
+        && ossl_quic_rstream_available(xso->stream->rstream, &avail, &fin)
+        && (avail > 0 || (fin && !xso->retired_fin));
+}
+
+/* Do we have the ER (exception: read) condition? */
+QUIC_NEEDS_LOCK
+static int test_poll_event_er(QUIC_XSO *xso)
+{
+    return ossl_quic_stream_has_recv(xso->stream)
+        && ossl_quic_stream_recv_is_reset(xso->stream)
+        && !xso->retired_fin;
+}
+
+/* Do we have the W (write) condition? */
+QUIC_NEEDS_LOCK
+static int test_poll_event_w(QUIC_XSO *xso)
+{
+    return !xso->conn->shutting_down
+        && ossl_quic_stream_has_send_buffer(xso->stream)
+        && ossl_quic_sstream_get_buffer_avail(xso->stream->sstream)
+        && !ossl_quic_sstream_get_final_size(xso->stream->sstream, NULL)
+        && quic_mutation_allowed(xso->conn, /*req_active=*/1);
+}
+
+/* Do we have the EW (exception: write) condition? */
+QUIC_NEEDS_LOCK
+static int test_poll_event_ew(QUIC_XSO *xso)
+{
+    return ossl_quic_stream_has_send(xso->stream)
+        && xso->stream->peer_stop_sending
+        && !xso->requested_reset
+        && !xso->conn->shutting_down;
+}
+
+/* Do we have the EC (exception: connection) condition? */
+QUIC_NEEDS_LOCK
+static int test_poll_event_ec(QUIC_CONNECTION *qc)
+{
+    return ossl_quic_channel_is_term_any(qc->ch);
+}
+
+/* Do we have the ECD (exception: connection drained) condition? */
+QUIC_NEEDS_LOCK
+static int test_poll_event_ecd(QUIC_CONNECTION *qc)
+{
+    return ossl_quic_channel_is_terminated(qc->ch);
+}
+
+/* Do we have the IS (incoming: stream) condition? */
+QUIC_NEEDS_LOCK
+static int test_poll_event_is(QUIC_CONNECTION *qc, int is_uni)
+{
+    return ossl_quic_stream_map_get_accept_queue_len(ossl_quic_channel_get_qsm(qc->ch),
+                                                     is_uni);
+}
+
+/* Do we have the OS (outgoing: stream) condition? */
+QUIC_NEEDS_LOCK
+static int test_poll_event_os(QUIC_CONNECTION *qc, int is_uni)
+{
+    /* Is it currently possible for us to make an outgoing stream? */
+    return quic_mutation_allowed(qc, /*req_active=*/1)
+        && ossl_quic_channel_get_local_stream_count_avail(qc->ch, is_uni) > 0;
+}
+
+QUIC_TAKES_LOCK
+int ossl_quic_conn_poll_events(SSL *ssl, uint64_t events, int do_tick,
+                               uint64_t *p_revents)
+{
+    QCTX ctx;
+    uint64_t revents = 0;
+
+    if (!expect_quic(ssl, &ctx))
+        return 0;
+
+    quic_lock(ctx.qc);
+
+    if (do_tick)
+        ossl_quic_reactor_tick(ossl_quic_channel_get_reactor(ctx.qc->ch), 0);
+
+    if (ctx.xso != NULL) {
+        /* SSL object has a stream component. */
+
+        if ((events & SSL_POLL_EVENT_R) != 0
+            && test_poll_event_r(ctx.xso))
+            revents |= SSL_POLL_EVENT_R;
+
+        if ((events & SSL_POLL_EVENT_ER) != 0
+            && test_poll_event_er(ctx.xso))
+            revents |= SSL_POLL_EVENT_ER;
+
+        if ((events & SSL_POLL_EVENT_W) != 0
+            && test_poll_event_w(ctx.xso))
+            revents |= SSL_POLL_EVENT_W;
+
+        if ((events & SSL_POLL_EVENT_EW) != 0
+            && test_poll_event_ew(ctx.xso))
+            revents |= SSL_POLL_EVENT_EW;
+    }
+
+    if (!ctx.is_stream) {
+        if ((events & SSL_POLL_EVENT_EC) != 0
+            && test_poll_event_ec(ctx.qc))
+            revents |= SSL_POLL_EVENT_EC;
+
+        if ((events & SSL_POLL_EVENT_ECD) != 0
+            && test_poll_event_ecd(ctx.qc))
+            revents |= SSL_POLL_EVENT_ECD;
+
+        if ((events & SSL_POLL_EVENT_ISB) != 0
+            && test_poll_event_is(ctx.qc, /*uni=*/0))
+            revents |= SSL_POLL_EVENT_ISB;
+
+        if ((events & SSL_POLL_EVENT_ISU) != 0
+            && test_poll_event_is(ctx.qc, /*uni=*/1))
+            revents |= SSL_POLL_EVENT_ISU;
+
+        if ((events & SSL_POLL_EVENT_OSB) != 0
+            && test_poll_event_os(ctx.qc, /*uni=*/0))
+            revents |= SSL_POLL_EVENT_OSB;
+
+        if ((events & SSL_POLL_EVENT_OSU) != 0
+            && test_poll_event_os(ctx.qc, /*uni=*/1))
+            revents |= SSL_POLL_EVENT_OSU;
+    }
+
+    quic_unlock(ctx.qc);
+    *p_revents = revents;
+    return 1;
+}
+
+/*
  * Internal Testing APIs
  * =====================
  */
@@ -3697,4 +3999,20 @@ QUIC_CHANNEL *ossl_quic_conn_get_channel(SSL *s)
         return NULL;
 
     return ctx.qc->ch;
+}
+
+int ossl_quic_set_diag_title(SSL_CTX *ctx, const char *title)
+{
+#ifndef OPENSSL_NO_QLOG
+    OPENSSL_free(ctx->qlog_title);
+    ctx->qlog_title = NULL;
+
+    if (title == NULL)
+        return 1;
+
+    if ((ctx->qlog_title = OPENSSL_strdup(title)) == NULL)
+        return 0;
+#endif
+
+    return 1;
 }
