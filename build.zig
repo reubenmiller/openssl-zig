@@ -897,7 +897,7 @@ fn libssl(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin
     lib.defineCMacro("OPENSSL_NO_ASM", null);
     lib.defineCMacro("OPENSSL_NO_KTLS", null);
     lib.defineCMacro("OPENSSL_NO_QUIC", null);
-    lib.defineCMacro("OSSL_NELEM", null);
+    lib.defineCMacro("OPENSSL_NO_QLOG", null);
     if (lib.rootModuleTarget().isMinGW())
         lib.defineCMacro("NOCRYPT", "1");
     lib.addCSourceFiles(.{
