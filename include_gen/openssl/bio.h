@@ -71,6 +71,7 @@ extern "C" {
 # define BIO_TYPE_DGRAM_MEM      (27|BIO_TYPE_SOURCE_SINK)
 
 #define BIO_TYPE_START           128
+#define BIO_TYPE_MASK            0xFF
 
 /*
  * BIO_FILENAME_READ|BIO_CLOSE to open or close on free.

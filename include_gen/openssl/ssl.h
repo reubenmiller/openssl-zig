@@ -1760,6 +1760,8 @@ __owur long SSL_SESSION_get_timeout(const SSL_SESSION *s);
 __owur long SSL_SESSION_set_timeout(SSL_SESSION *s, long t);
 __owur int SSL_SESSION_get_protocol_version(const SSL_SESSION *s);
 __owur int SSL_SESSION_set_protocol_version(SSL_SESSION *s, int version);
+__owur time_t SSL_SESSION_get_time_ex(const SSL_SESSION *s);
+__owur time_t SSL_SESSION_set_time_ex(SSL_SESSION *s, time_t t);
 
 __owur const char *SSL_SESSION_get0_hostname(const SSL_SESSION *s);
 __owur int SSL_SESSION_set1_hostname(SSL_SESSION *s, const char *hostname);
@@ -2214,6 +2216,15 @@ void *SSL_CTX_get_ex_data(const SSL_CTX *ssl, int idx);
 
 __owur int SSL_get_ex_data_X509_STORE_CTX_idx(void);
 
+# define SSL_VALUE_EVENT_HANDLING_MODE              6
+# define SSL_VALUE_STREAM_WRITE_BUF_SIZE            7
+# define SSL_VALUE_STREAM_WRITE_BUF_USED            8
+# define SSL_VALUE_STREAM_WRITE_BUF_AVAIL           9
+
+# define SSL_VALUE_EVENT_HANDLING_MODE_INHERIT      0
+# define SSL_VALUE_EVENT_HANDLING_MODE_IMPLICIT     1
+# define SSL_VALUE_EVENT_HANDLING_MODE_EXPLICIT     2
+
 # define SSL_CTX_sess_set_cache_size(ctx,t) \
         SSL_CTX_ctrl(ctx,SSL_CTRL_SET_SESS_CACHE_SIZE,t,NULL)
 # define SSL_CTX_sess_get_cache_size(ctx) \
@@ -2255,6 +2266,23 @@ __owur int SSL_get_ex_data_X509_STORE_CTX_idx(void);
 
 void SSL_CTX_set_default_read_buffer_len(SSL_CTX *ctx, size_t len);
 void SSL_set_default_read_buffer_len(SSL *s, size_t len);
+
+# define SSL_get_event_handling_mode(ssl, value) \
+    SSL_get_generic_value_uint((ssl), SSL_VALUE_EVENT_HANDLING_MODE, \
+                               (value))
+# define SSL_set_event_handling_mode(ssl, value) \
+    SSL_set_generic_value_uint((ssl), SSL_VALUE_EVENT_HANDLING_MODE, \
+                               (value))
+
+# define SSL_get_stream_write_buf_size(ssl, value) \
+    SSL_get_generic_value_uint((ssl), SSL_VALUE_STREAM_WRITE_BUF_SIZE, \
+                               (value))
+# define SSL_get_stream_write_buf_used(ssl, value) \
+    SSL_get_generic_value_uint((ssl), SSL_VALUE_STREAM_WRITE_BUF_USED, \
+                               (value))
+# define SSL_get_stream_write_buf_avail(ssl, value) \
+    SSL_get_generic_value_uint((ssl), SSL_VALUE_STREAM_WRITE_BUF_AVAIL, \
+                               (value))
 
 # ifndef OPENSSL_NO_DH
 #  ifndef OPENSSL_NO_DEPRECATED_3_0
