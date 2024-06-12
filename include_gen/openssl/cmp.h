@@ -249,6 +249,8 @@ SKM_DEFINE_STACK_OF_INTERNAL(OSSL_CMP_CERTSTATUS, OSSL_CMP_CERTSTATUS, OSSL_CMP_
 
 typedef struct ossl_cmp_itav_st OSSL_CMP_ITAV;
 DECLARE_ASN1_DUP_FUNCTION(OSSL_CMP_ITAV)
+typedef struct ossl_cmp_crlstatus_st OSSL_CMP_CRLSTATUS;
+DECLARE_ASN1_DUP_FUNCTION(OSSL_CMP_CRLSTATUS)
 SKM_DEFINE_STACK_OF_INTERNAL(OSSL_CMP_ITAV, OSSL_CMP_ITAV, OSSL_CMP_ITAV)
 #define sk_OSSL_CMP_ITAV_num(sk) OPENSSL_sk_num(ossl_check_const_OSSL_CMP_ITAV_sk_type(sk))
 #define sk_OSSL_CMP_ITAV_value(sk, idx) ((OSSL_CMP_ITAV *)OPENSSL_sk_value(ossl_check_const_OSSL_CMP_ITAV_sk_type(sk), (idx)))
@@ -379,6 +381,15 @@ ASN1_OBJECT *OSSL_CMP_ITAV_get0_type(const OSSL_CMP_ITAV *itav);
 ASN1_TYPE *OSSL_CMP_ITAV_get0_value(const OSSL_CMP_ITAV *itav);
 int OSSL_CMP_ITAV_push0_stack_item(STACK_OF(OSSL_CMP_ITAV) **itav_sk_p,
                                    OSSL_CMP_ITAV *itav);
+OSSL_CMP_CRLSTATUS *OSSL_CMP_CRLSTATUS_create(const X509_CRL *crl,
+                                              const X509 *cert, int only_DN);
+OSSL_CMP_CRLSTATUS *OSSL_CMP_CRLSTATUS_new1(const DIST_POINT_NAME *dpn,
+                                            const GENERAL_NAMES *issuer,
+                                            const ASN1_TIME *thisUpdate);
+int OSSL_CMP_CRLSTATUS_get0(const OSSL_CMP_CRLSTATUS *crlstatus,
+                            DIST_POINT_NAME **dpn, GENERAL_NAMES **issuer,
+                            ASN1_TIME **thisUpdate);
+void OSSL_CMP_CRLSTATUS_free(OSSL_CMP_CRLSTATUS *crlstatus);
 void OSSL_CMP_ITAV_free(OSSL_CMP_ITAV *itav);
 void OSSL_CMP_MSG_free(OSSL_CMP_MSG *msg);
 

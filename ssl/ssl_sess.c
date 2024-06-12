@@ -618,6 +618,7 @@ int ssl_get_prev_session(SSL_CONNECTION *s, CLIENTHELLO_MSG *hello)
         case SSL_TICKET_NO_DECRYPT:
         case SSL_TICKET_SUCCESS:
         case SSL_TICKET_SUCCESS_RENEW:
+        default:
             break;
         }
     }
@@ -1189,12 +1190,9 @@ int SSL_set_session_ticket_ext(SSL *s, void *ext_data, int ext_len)
 
 #ifndef OPENSSL_NO_DEPRECATED_3_4
 void SSL_CTX_flush_sessions(SSL_CTX *s, long t)
-{
-    SSL_CTX_flush_sessions_ex(s, (time_t) t);
-}
-#endif
-
+#else
 void SSL_CTX_flush_sessions_ex(SSL_CTX *s, time_t t)
+#endif
 {
     STACK_OF(SSL_SESSION) *sk;
     SSL_SESSION *current;
