@@ -258,5 +258,4 @@ doc-nits
 compile_commands.json
 
 # Zig build
-zig-cache/
-zig-out/
+*zig-*/
