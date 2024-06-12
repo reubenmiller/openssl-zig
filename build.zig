@@ -7,10 +7,10 @@ pub fn build(b: *std.Build) void {
     const crypto = libcrypto(b, target, optimize);
     const ssl = libssl(b, target, optimize);
 
-    crypto.installHeadersDirectory("include/crypto", "crypto");
-    crypto.installHeadersDirectory("include/internal", "internal");
-    ssl.installHeadersDirectory("include/openssl", "openssl");
-    ssl.installHeadersDirectory("include_gen", "");
+    crypto.installHeadersDirectory(b.path("include/crypto"), "crypto", .{});
+    crypto.installHeadersDirectory(b.path("include/internal"), "internal", .{});
+    ssl.installHeadersDirectory(b.path("include/openssl"), "openssl", .{});
+    ssl.installHeadersDirectory(b.path("include_gen"), "", .{});
     b.installArtifact(crypto);
     b.installArtifact(ssl);
 }
@@ -26,12 +26,12 @@ fn libcrypto(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.buil
         .Debug, .ReleaseSafe => lib.bundle_compiler_rt = true,
         else => lib.root_module.strip = true,
     }
-    lib.addIncludePath(.{ .path = "include" });
-    lib.addIncludePath(.{ .path = "." });
-    lib.addIncludePath(.{ .path = "providers/common/include" });
-    lib.addIncludePath(.{ .path = "providers/fips" });
-    lib.addIncludePath(.{ .path = "providers/implementations/include" });
-    lib.addIncludePath(.{ .path = "include_gen" });
+    lib.addIncludePath(b.path("include"));
+    lib.addIncludePath(b.path("."));
+    lib.addIncludePath(b.path("providers/common/include"));
+    lib.addIncludePath(b.path("providers/fips"));
+    lib.addIncludePath(b.path("providers/implementations/include"));
+    lib.addIncludePath(b.path("include_gen"));
     // lib.defineCMacro("OPENSSL_NO_DEPRECATED", null);
     lib.defineCMacro("OPENSSL_NO_ENGINE", null);
     lib.defineCMacro("OPENSSL_NO_SRP", null);
@@ -887,8 +887,8 @@ fn libssl(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin
         .Debug, .ReleaseSafe => lib.bundle_compiler_rt = true,
         else => lib.root_module.strip = true,
     }
-    lib.addIncludePath(.{ .path = "include" });
-    lib.addIncludePath(.{ .path = "include_gen" });
+    lib.addIncludePath(b.path("include"));
+    lib.addIncludePath(b.path("include_gen"));
     lib.defineCMacro("OPENSSL_NO_DEPRECATED", null);
     lib.defineCMacro("OPENSSL_NO_ENGINE", null);
     lib.defineCMacro("OPENSSL_NO_SRP", null);
@@ -997,13 +997,13 @@ fn libprovider(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bu
         .target = target,
         .optimize = optimize,
     });
-    lib.addIncludePath(.{ .path = "include" });
-    lib.addIncludePath(.{ .path = "." });
-    lib.addIncludePath(.{ .path = "providers/common/include" });
-    lib.addIncludePath(.{ .path = "providers/fips" });
-    lib.addIncludePath(.{ .path = "providers/implementations/include" });
-    lib.addIncludePath(.{ .path = "include_gen" });
-    lib.addIncludePath(.{ .path = "crypto" });
+    lib.addIncludePath(b.path("include"));
+    lib.addIncludePath(b.path("."));
+    lib.addIncludePath(b.path("providers/common/include"));
+    lib.addIncludePath(b.path("providers/fips"));
+    lib.addIncludePath(b.path("providers/implementations/include"));
+    lib.addIncludePath(b.path("include_gen"));
+    lib.addIncludePath(b.path("crypto"));
     lib.defineCMacro("OPENSSL_NO_DEPRECATED", null);
     lib.defineCMacro("OPENSSL_NO_ENGINE", null);
     lib.defineCMacro("OPENSSL_NO_SRP", null);
@@ -1018,7 +1018,7 @@ fn libprovider(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bu
         // CommonCrypto
         lib.linkFramework("CoreServices");
         lib.defineCMacro("OPENSSL_SYS_MACOSX", "1");
-        lib.addSystemIncludePath(.{ .path = "/usr/include" });
+        lib.addSystemIncludePath(.{ .cwd_relative = "/usr/include" });
     }
     if (lib.rootModuleTarget().isMinGW())
         lib.defineCMacro("NOCRYPT", "1");
