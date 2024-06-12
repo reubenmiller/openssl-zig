@@ -1,5 +1,5 @@
 #! /usr/bin/env perl
-# Copyright 2023 The OpenSSL Project Authors. All Rights Reserved.
+# Copyright 2023-2024 The OpenSSL Project Authors. All Rights Reserved.
 #
 # Licensed under the Apache License 2.0 (the "License").  You may not use
 # this file except in compliance with the License.  You can obtain a copy
@@ -85,9 +85,11 @@ sub run_test {
 
     print("ocsp server ready, listening on port $ocsp_port\n");
 
-    # openssl s_server -accept 0 -cert server.pem -cert_chain intermediate-cert.pem \
+    # openssl s_server -accept 0 -naccept 1 \
+    #                  -cert server.pem -cert_chain intermediate-cert.pem \
     #                  -status_verbose -status_url http://localhost:19254/ocsp
-    my @s_server_cmd = ("s_server", "-accept", "0", "-cert", $server_pem, "-cert_chain", $intermediate_cert_pem,
+    my @s_server_cmd = ("s_server", "-accept", "0", "-naccept", "1",
+                        "-cert", $server_pem, "-cert_chain", $intermediate_cert_pem,
                         "-status_verbose", "-status_url", "http://localhost:${ocsp_port}/ocsp");
     my $s_server_pid = open3(my $s_server_i, my $s_server_o, my $s_server_e = gensym, $shlib_wrap, $apps_openssl, @s_server_cmd);
 
@@ -118,6 +120,9 @@ sub run_test {
     my @s_client_cmd = ("s_client", "-connect", "localhost:$server_port", "-status", "-verify_return_error");
     my $s_client_pid = open3(my $s_client_i, my $s_client_o, my $s_client_e = gensym, $shlib_wrap, $apps_openssl, @s_client_cmd);
 
+    waitpid($s_client_pid, 0);
+    kill 'HUP', $s_server_pid, $ocsp_pid;
+
     ### the output from s_server that we want to check is written to its stderr
     ###    cert_status: ocsp response sent:
 
@@ -128,16 +133,9 @@ sub run_test {
         if (/^cert_status: ocsp response sent:/) {
             $resp = 1;
             last;
-        } elsif (/^cert_status:/) {
-            ;
-        } else {
-            last;
         }
     }
     ok($resp == 1, "check s_server sent ocsp response");
-
-    waitpid($s_client_pid, 0);
-    kill 'HUP', $s_server_pid, $ocsp_pid;
 }
 
 run_test();
