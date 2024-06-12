@@ -7,10 +7,10 @@ pub fn build(b: *std.Build) void {
     const crypto = libcrypto(b, target, optimize);
     const ssl = libssl(b, target, optimize);
 
-    crypto.installHeadersDirectory("include/crypto", "crypto");
-    crypto.installHeadersDirectory("include/internal", "internal");
-    ssl.installHeadersDirectory("include/openssl", "openssl");
-    ssl.installHeadersDirectory("include_gen", "");
+    crypto.installHeadersDirectory("include/crypto", "crypto", .{});
+    crypto.installHeadersDirectory("include/internal", "internal", .{});
+    ssl.installHeadersDirectory("include/openssl", "openssl", .{});
+    ssl.installHeadersDirectory("include_gen", "", .{});
     b.installArtifact(crypto);
     b.installArtifact(ssl);
 }
