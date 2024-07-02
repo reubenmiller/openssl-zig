@@ -2,8 +2,16 @@
     .name = "openssl",
     .version = "3.4.0",
     .paths = .{
+        "*.h",
         "build.zig",
+        "crypto",
+        "include_gen",
+        "include/crypto",
+        "include/internal",
+        "include/openssl",
         "LICENSE",
+        "providers",
         "README.md",
+        "ssl",
     },
 }
