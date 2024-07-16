@@ -160,6 +160,7 @@ const char *OpenSSL_version(int type);
 # define OPENSSL_FULL_VERSION_STRING    7
 # define OPENSSL_MODULES_DIR            8
 # define OPENSSL_CPU_INFO               9
+# define OPENSSL_WINCTX             	10
 
 # define MODULESDIR "zig-out/lib";
 # define ENGINESDIR "zig-out/lib";

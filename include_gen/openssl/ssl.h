@@ -234,7 +234,6 @@ typedef struct ssl_cipher_st SSL_CIPHER;
 typedef struct ssl_session_st SSL_SESSION;
 typedef struct tls_sigalgs_st TLS_SIGALGS;
 typedef struct ssl_conf_ctx_st SSL_CONF_CTX;
-typedef struct ssl_comp_st SSL_COMP;
 
 STACK_OF(SSL_CIPHER);
 STACK_OF(SSL_COMP);

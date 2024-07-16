@@ -898,6 +898,7 @@ fn libssl(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin
     lib.defineCMacro("OPENSSL_NO_KTLS", null);
     lib.defineCMacro("OPENSSL_NO_QUIC", null);
     lib.defineCMacro("OPENSSL_NO_QLOG", null);
+    lib.defineCMacro("OSSL_LIBSSL_RECORD_LAYER_PARAM_HS_PADDING", null);
     if (lib.rootModuleTarget().isMinGW())
         lib.defineCMacro("NOCRYPT", "1");
     lib.addCSourceFiles(.{
@@ -1062,7 +1063,7 @@ fn libprovider(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bu
             "providers/common/provider_util.c",
             "providers/common/securitycheck.c",
             "providers/common/securitycheck_default.c",
-            "providers/common/securitycheck_fips.c",
+            // "providers/common/securitycheck_fips.c",
             "providers/defltprov.c",
             "providers/fips/fips_entry.c",
             "providers/fips/fipsprov.c",
