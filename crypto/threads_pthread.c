@@ -59,7 +59,11 @@ __tsan_mutex_post_lock((x), 0, 0)
 
 # include <assert.h>
 
-# ifdef PTHREAD_RWLOCK_INITIALIZER
+/*
+ * The Non-Stop KLT thread model currently seems broken in its rwlock
+ * implementation
+ */
+# if defined(PTHREAD_RWLOCK_INITIALIZER) && !defined(_KLT_MODEL_)
 #  define USE_RWLOCK
 # endif
 
@@ -114,6 +118,7 @@ static inline void *apple_atomic_load_n_pvoid(void **p,
 }
 
 /* For uint64_t, we should be fine, though */
+#   define apple_atomic_load_n_uint32_t(p, o) __atomic_load_n(p, o)
 #   define apple_atomic_load_n_uint64_t(p, o) __atomic_load_n(p, o)
 
 #   define ATOMIC_LOAD_N(t, p, o) apple_atomic_load_n_##t(p, o)
@@ -141,6 +146,7 @@ static pthread_mutex_t atomic_sim_lock = PTHREAD_MUTEX_INITIALIZER;
         pthread_mutex_unlock(&atomic_sim_lock);                 \
         return ret;                                             \
     }
+IMPL_fallback_atomic_load_n(uint32_t)
 IMPL_fallback_atomic_load_n(uint64_t)
 IMPL_fallback_atomic_load_n(pvoid)
 
@@ -157,6 +163,7 @@ IMPL_fallback_atomic_load_n(pvoid)
         pthread_mutex_unlock(&atomic_sim_lock);                 \
         return ret;                                             \
     }
+IMPL_fallback_atomic_store_n(uint32_t)
 IMPL_fallback_atomic_store_n(uint64_t)
 
 #  define ATOMIC_STORE_N(t, p, v, o) fallback_atomic_store_n_##t(p, v)
@@ -265,17 +272,19 @@ static ossl_inline uint64_t fallback_atomic_or_fetch(uint64_t *p, uint64_t m)
 /*
  * users is broken up into 2 parts
  * bits 0-15 current readers
- * bit 32-63 - ID
+ * bit 32-63 ID
  */
 # define READER_SHIFT 0
 # define ID_SHIFT 32
+/* TODO: READER_SIZE 32 in threads_win.c */
 # define READER_SIZE 16
 # define ID_SIZE 32
 
 # define READER_MASK     (((uint64_t)1 << READER_SIZE) - 1)
 # define ID_MASK         (((uint64_t)1 << ID_SIZE) - 1)
-# define READER_COUNT(x) (((uint64_t)(x) >> READER_SHIFT) & READER_MASK)
-# define ID_VAL(x)       (((uint64_t)(x) >> ID_SHIFT) & ID_MASK)
+# define READER_COUNT(x) ((uint32_t)(((uint64_t)(x) >> READER_SHIFT) & \
+                                     READER_MASK))
+# define ID_VAL(x)       ((uint32_t)(((uint64_t)(x) >> ID_SHIFT) & ID_MASK))
 # define VAL_READER      ((uint64_t)1 << READER_SHIFT)
 # define VAL_ID(x)       ((uint64_t)x << ID_SHIFT)
 
@@ -322,20 +331,21 @@ struct rcu_lock_st {
     /* rcu generation counter for in-order retirement */
     uint32_t id_ctr;
 
+    /* TODO: can be moved before id_ctr for better alignment */
     /* Array of quiescent points for synchronization */
     struct rcu_qp *qp_group;
 
     /* Number of elements in qp_group array */
-    size_t group_count;
+    uint32_t group_count;
 
     /* Index of the current qp in the qp_group array */
-    uint64_t reader_idx;
+    uint32_t reader_idx;
 
     /* value of the next id_ctr value to be retired */
     uint32_t next_to_retire;
 
     /* index of the next free rcu_qp in the qp_group */
-    uint64_t current_alloc_idx;
+    uint32_t current_alloc_idx;
 
     /* number of qp's in qp_group array currently being retired */
     uint32_t writers_alloced;
@@ -359,7 +369,7 @@ struct rcu_lock_st {
 /* Read side acquisition of the current qp */
 static struct rcu_qp *get_hold_current_qp(struct rcu_lock_st *lock)
 {
-    uint64_t qp_idx;
+    uint32_t qp_idx;
 
     /* get the current qp index */
     for (;;) {
@@ -375,7 +385,7 @@ static struct rcu_qp *get_hold_current_qp(struct rcu_lock_st *lock)
          * systems like x86, but is relevant on other arches
          * Note: This applies to the reload below as well
          */
-        qp_idx = ATOMIC_LOAD_N(uint64_t, &lock->reader_idx, __ATOMIC_ACQUIRE);
+        qp_idx = ATOMIC_LOAD_N(uint32_t, &lock->reader_idx, __ATOMIC_ACQUIRE);
 
         /*
          * Notes of use of __ATOMIC_RELEASE
@@ -388,7 +398,8 @@ static struct rcu_qp *get_hold_current_qp(struct rcu_lock_st *lock)
                          __ATOMIC_RELEASE);
 
         /* if the idx hasn't changed, we're good, else try again */
-        if (qp_idx == ATOMIC_LOAD_N(uint64_t, &lock->reader_idx, __ATOMIC_ACQUIRE))
+        if (qp_idx == ATOMIC_LOAD_N(uint32_t, &lock->reader_idx,
+                                    __ATOMIC_ACQUIRE))
             break;
 
         /*
@@ -471,8 +482,8 @@ void ossl_rcu_read_unlock(CRYPTO_RCU_LOCK *lock)
              */
             data->thread_qps[i].depth--;
             if (data->thread_qps[i].depth == 0) {
-                ret = ATOMIC_SUB_FETCH(&data->thread_qps[i].qp->users, VAL_READER,
-                                       __ATOMIC_RELEASE);
+                ret = ATOMIC_SUB_FETCH(&data->thread_qps[i].qp->users,
+                                       VAL_READER, __ATOMIC_RELEASE);
                 OPENSSL_assert(ret != UINT64_MAX);
                 data->thread_qps[i].qp = NULL;
                 data->thread_qps[i].lock = NULL;
@@ -494,7 +505,7 @@ void ossl_rcu_read_unlock(CRYPTO_RCU_LOCK *lock)
 static struct rcu_qp *update_qp(CRYPTO_RCU_LOCK *lock)
 {
     uint64_t new_id;
-    uint64_t current_idx;
+    uint32_t current_idx;
 
     pthread_mutex_lock(&lock->alloc_lock);
 
@@ -517,10 +528,9 @@ static struct rcu_qp *update_qp(CRYPTO_RCU_LOCK *lock)
         (lock->current_alloc_idx + 1) % lock->group_count;
 
     /* get and insert a new id */
-    new_id = lock->id_ctr;
+    new_id = VAL_ID(lock->id_ctr);
     lock->id_ctr++;
 
-    new_id = VAL_ID(new_id);
     /*
      * Even though we are under a write side lock here
      * We need to use atomic instructions to ensure that the results
@@ -538,7 +548,7 @@ static struct rcu_qp *update_qp(CRYPTO_RCU_LOCK *lock)
      * of __ATOMIC_ACQUIRE in get_hold_current_qp, as we want any publication
      * of this value to be seen on the read side immediately after it happens
      */
-    ATOMIC_STORE_N(uint64_t, &lock->reader_idx, lock->current_alloc_idx,
+    ATOMIC_STORE_N(uint32_t, &lock->reader_idx, lock->current_alloc_idx,
                    __ATOMIC_RELEASE);
 
     /* wake up any waiters */
@@ -555,6 +565,8 @@ static void retire_qp(CRYPTO_RCU_LOCK *lock, struct rcu_qp *qp)
     pthread_mutex_unlock(&lock->alloc_lock);
 }
 
+/* TODO: count should be unsigned, e.g uint32_t */
+/* a negative value could result in unexpected behaviour */
 static struct rcu_qp *allocate_new_qp_group(CRYPTO_RCU_LOCK *lock,
                                             int count)
 {
@@ -987,7 +999,7 @@ int CRYPTO_atomic_store(uint64_t *dst, uint64_t val, CRYPTO_RWLOCK *lock)
         return 1;
     }
 # endif
-    if (lock == NULL || !CRYPTO_THREAD_read_lock(lock))
+    if (lock == NULL || !CRYPTO_THREAD_write_lock(lock))
         return 0;
     *dst  = val;
     if (!CRYPTO_THREAD_unlock(lock))
@@ -1006,7 +1018,7 @@ int CRYPTO_atomic_load_int(int *val, int *ret, CRYPTO_RWLOCK *lock)
 # elif defined(__sun) && (defined(__SunOS_5_10) || defined(__SunOS_5_11))
     /* This will work for all future Solaris versions. */
     if (ret != NULL) {
-        *ret = (int *)atomic_or_uint_nv((unsigned int *)val, 0);
+        *ret = (int)atomic_or_uint_nv((unsigned int *)val, 0);
         return 1;
     }
 # endif

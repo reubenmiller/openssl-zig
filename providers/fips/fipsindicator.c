@@ -10,13 +10,16 @@
 #include <openssl/indicator.h>
 #include <openssl/params.h>
 #include <openssl/core_names.h>
-#include "prov/fipsindicator.h"
 #include "internal/common.h" /* for ossl_assert() */
+#include "fips/fipsindicator.h"
 
 void ossl_FIPS_IND_init(OSSL_FIPS_IND *ind)
 {
+    int i;
+
     ossl_FIPS_IND_set_approved(ind); /* Assume we are approved by default */
-    memset(ind->settable, OSSL_FIPS_IND_STATE_UNKNOWN, sizeof(ind->settable));
+    for (i = 0; i < OSSL_FIPS_IND_SETTABLE_MAX; i++)
+        ind->settable[i] = OSSL_FIPS_IND_STATE_UNKNOWN;
 }
 
 void ossl_FIPS_IND_set_approved(OSSL_FIPS_IND *ind)

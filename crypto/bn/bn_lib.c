@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2023 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2024 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -82,8 +82,9 @@ int BN_get_params(int which)
 const BIGNUM *BN_value_one(void)
 {
     static const BN_ULONG data_one = 1L;
-    static const BIGNUM const_one =
-        { (BN_ULONG *)&data_one, 1, 1, 0, BN_FLG_STATIC_DATA };
+    static const BIGNUM const_one = {
+        (BN_ULONG *)&data_one, 1, 1, 0, BN_FLG_STATIC_DATA
+    };
 
     return &const_one;
 }

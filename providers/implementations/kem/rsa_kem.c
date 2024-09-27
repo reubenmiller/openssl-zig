@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2020-2024 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -13,7 +13,6 @@
  */
 #include "internal/deprecated.h"
 #include "internal/nelem.h"
-
 #include <openssl/crypto.h>
 #include <openssl/evp.h>
 #include <openssl/core_dispatch.h>
@@ -21,13 +20,11 @@
 #include <openssl/rsa.h>
 #include <openssl/params.h>
 #include <openssl/err.h>
-#include "crypto/rsa.h"
 #include <openssl/proverr.h>
-#include "internal/nelem.h"
+#include "crypto/rsa.h"
 #include "prov/provider_ctx.h"
 #include "prov/implementations.h"
 #include "prov/securitycheck.h"
-#include "prov/fipsindicator.h"
 
 static OSSL_FUNC_kem_newctx_fn rsakem_newctx;
 static OSSL_FUNC_kem_encapsulate_init_fn rsakem_encapsulate_init;

@@ -9,9 +9,10 @@
  * https://www.openssl.org/source/license.html
  */
 
-#include <stdio.h>
-#include "ssl_local.h"
 #include "internal/e_os.h"
+#include "internal/e_winsock.h"
+#include "ssl_local.h"
+
 #include <openssl/objects.h>
 #include <openssl/x509v3.h>
 #include <openssl/rand.h>
@@ -22,10 +23,12 @@
 #include <openssl/ct.h>
 #include <openssl/trace.h>
 #include <openssl/core_names.h>
+#include <openssl/provider.h>
 #include "internal/cryptlib.h"
 #include "internal/nelem.h"
 #include "internal/refcount.h"
 #include "internal/ktls.h"
+#include "internal/to_hex.h"
 #include "quic/quic_local.h"
 
 static int ssl_undefined_function_3(SSL_CONNECTION *sc, unsigned char *r,
@@ -1116,8 +1119,7 @@ int SSL_add1_host(SSL *s, const char *hostname)
 
     /* If a hostname is provided and parses as an IP address,
      * treat it as such. */
-    if (hostname)
-    {
+    if (hostname) {
         ASN1_OCTET_STRING *ip;
         char *old_ip;
 
@@ -1127,8 +1129,7 @@ int SSL_add1_host(SSL *s, const char *hostname)
             ASN1_OCTET_STRING_free(ip);
 
             old_ip = X509_VERIFY_PARAM_get1_ip_asc(sc->param);
-            if (old_ip)
-            {
+            if (old_ip) {
                 OPENSSL_free(old_ip);
                 /* There can be only one IP address */
                 return 0;
@@ -4813,15 +4814,9 @@ int ssl_undefined_void_function(void)
     return 0;
 }
 
-int ssl_undefined_const_function(const SSL *s)
-{
-    return 0;
-}
-
 const char *ssl_protocol_to_string(int version)
 {
-    switch (version)
-    {
+    switch (version) {
     case TLS1_3_VERSION:
         return "TLSv1.3";
 
@@ -6752,9 +6747,7 @@ static int nss_keylog_int(const char *prefix,
 {
     char *out = NULL;
     char *cursor = NULL;
-    size_t out_len = 0;
-    size_t i;
-    size_t prefix_len;
+    size_t out_len = 0, i, prefix_len;
     SSL_CTX *sctx = SSL_CONNECTION_GET_CTX(sc);
 
     if (sctx->keylog_callback == NULL)
@@ -6773,26 +6766,21 @@ static int nss_keylog_int(const char *prefix,
     if ((out = cursor = OPENSSL_malloc(out_len)) == NULL)
         return 0;
 
-    strcpy(cursor, prefix);
+    memcpy(cursor, prefix, prefix_len);
     cursor += prefix_len;
     *cursor++ = ' ';
 
-    for (i = 0; i < parameter_1_len; i++) {
-        sprintf(cursor, "%02x", parameter_1[i]);
-        cursor += 2;
-    }
+    for (i = 0; i < parameter_1_len; ++i)
+        cursor += ossl_to_lowerhex(cursor, parameter_1[i]);
     *cursor++ = ' ';
 
-    for (i = 0; i < parameter_2_len; i++) {
-        sprintf(cursor, "%02x", parameter_2[i]);
-        cursor += 2;
-    }
+    for (i = 0; i < parameter_2_len; ++i)
+        cursor += ossl_to_lowerhex(cursor, parameter_2[i]);
     *cursor = '\0';
 
     sctx->keylog_callback(SSL_CONNECTION_GET_SSL(sc), (const char *)out);
     OPENSSL_clear_free(out, out_len);
     return 1;
-
 }
 
 int ssl_log_rsa_client_key_exchange(SSL_CONNECTION *sc,
@@ -7238,6 +7226,20 @@ const EVP_CIPHER *ssl_evp_cipher_fetch(OSSL_LIB_CTX *libctx,
      */
     ERR_set_mark();
     ciph = EVP_CIPHER_fetch(libctx, OBJ_nid2sn(nid), properties);
+    if (ciph != NULL) {
+        OSSL_PARAM params[2];
+        int decrypt_only = 0;
+
+        params[0] = OSSL_PARAM_construct_int(OSSL_CIPHER_PARAM_DECRYPT_ONLY,
+                                             &decrypt_only);
+        params[1] = OSSL_PARAM_construct_end();
+        if (EVP_CIPHER_get_params((EVP_CIPHER *)ciph, params)
+            && decrypt_only) {
+            /* If a cipher is decrypt-only, it is unusable */
+            EVP_CIPHER_free((EVP_CIPHER *)ciph);
+            ciph = NULL;
+        }
+    }
     ERR_pop_to_mark();
     return ciph;
 }

@@ -128,10 +128,18 @@ static int tls13_cipher(OSSL_RECORD_LAYER *rl, TLS_RL_RECORD *recs,
     }
 
     /* For integrity-only ciphers, nonce_len is same as MAC size */
-    if (rl->mac_ctx != NULL)
+    if (rl->mac_ctx != NULL) {
         nonce_len = EVP_MAC_CTX_get_mac_size(rl->mac_ctx);
-    else
-        nonce_len = EVP_CIPHER_CTX_get_iv_length(enc_ctx);
+    } else {
+        int ivlen = EVP_CIPHER_CTX_get_iv_length(enc_ctx);
+
+        if (ivlen < 0) {
+            /* Should not happen */
+            RLAYERfatal(rl, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+            return 0;
+        }
+        nonce_len = (size_t)ivlen;
+    }
 
     if (!sending) {
         /*
@@ -339,7 +347,7 @@ static int tls13_add_record_padding(OSSL_RECORD_LAYER *rl,
          * We might want to change the "else if" below so that
          * library-added padding can still happen even if there
          * is an application-layer callback. The reason being
-         * the application may not be aware that the effectivness
+         * the application may not be aware that the effectiveness
          * of ECH could be damaged if the callback e.g. only
          * padded application data. However, doing so would be
          * a change that could break some application that has

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2020-2024 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -97,6 +97,12 @@ static int sm2sig_set_mdname(PROV_SM2_CTX *psm2ctx, const char *mdname)
                                    psm2ctx->propq);
     if (psm2ctx->md == NULL)
         return 0;
+
+    /* XOF digests don't work */
+    if (EVP_MD_xof(psm2ctx->md)) {
+        ERR_raise(ERR_LIB_PROV, PROV_R_XOF_DIGESTS_NOT_ALLOWED);
+        return 0;
+    }
 
     if (mdname == NULL)
         return 1;

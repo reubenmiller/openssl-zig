@@ -521,6 +521,35 @@ at the end of this document.
 
 [rng]: #notes-on-random-number-generation
 
+### jitter
+
+When configured with `enable-jitter`, a "JITTER" RNG is compiled that
+can provide an alternative software seed source. It can be configured
+by setting `seed` option in `openssl.cnf`. A minimal `openssl.cnf` is
+shown below:
+
+    openssl_conf = openssl_init
+
+    [openssl_init]
+    random = random
+
+    [random]
+    seed=JITTER
+
+It uses a statically linked [jitterentropy-library](https://github.com/smuellerDD/jitterentropy-library) as the seed source.
+
+Additional configuration flags available:
+
+    --with-jitter-include=DIR
+
+The directory for the location of the jitterentropy.h include file, if
+it is outside the system include path.
+
+    --with-jitter-lib=DIR
+
+This is the directory containing the static libjitterentropy.a
+library, if it is outside the system library path.
+
 Setting the FIPS HMAC key
 -------------------------
 
@@ -804,6 +833,13 @@ Build (and install) the FIPS provider
 
 Don't perform FIPS module run-time checks related to enforcement of security
 parameters such as minimum security strength of keys.
+
+### no-fips-post
+
+Don't perform FIPS module Power On Self Tests.
+
+This option MUST be used for debugging only as it makes the FIPS provider
+non-compliant. It is useful when setting breakpoints in FIPS algorithms.
 
 ### enable-fuzz-libfuzzer, enable-fuzz-afl
 
@@ -1297,7 +1333,7 @@ Configure OpenSSL
 ### Automatic Configuration
 
 In previous version, the `config` script determined the platform type and
-compiler and then called `Configure`. Starting with this release, they are
+compiler and then called `Configure`. Starting with version 3.0, they are
 the same.
 
 #### Unix / Linux / macOS
@@ -1640,6 +1676,12 @@ described here.  Examine the Makefiles themselves for the full list.
     build_docs
                    Build all documentation components.
 
+    debuginfo
+                    On unix platforms, this target can be used to create .debug
+                    libraries, which separate the DWARF information in the
+                    shared library ELF files into a separate file for use
+                    in post-mortem (core dump) debugging
+
     clean
                    Remove all build artefacts and return the directory to a "clean"
                    state.
@@ -1752,7 +1794,7 @@ More about our support resources can be found in the [SUPPORT] file.
 
 ### Configuration Errors
 
-If the `./Configure` or `./Configure` command fails with an error message,
+If the `./config` or `./Configure` command fails with an error message,
 read the error message carefully and try to figure out whether you made
 a mistake (e.g., by providing a wrong option), or whether the script is
 working incorrectly. If you think you encountered a bug, please

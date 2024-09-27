@@ -1886,7 +1886,7 @@ static MSG_PROCESS_RETURN tls_process_as_hello_retry_request(SSL_CONNECTION *s,
 
 MSG_PROCESS_RETURN tls_process_server_rpk(SSL_CONNECTION *sc, PACKET *pkt)
 {
-    EVP_PKEY *peer_rpk;
+    EVP_PKEY *peer_rpk = NULL;
 
     if (!tls_process_rpk(sc, pkt, &peer_rpk)) {
         /* SSLfatal() already called */
@@ -2699,7 +2699,7 @@ MSG_PROCESS_RETURN tls_process_new_session_ticket(SSL_CONNECTION *s,
             && (!PACKET_get_net_4(pkt, &age_add)
                 || !PACKET_get_length_prefixed_1(pkt, &nonce)))
         || !PACKET_get_net_2(pkt, &ticklen)
-        || (SSL_CONNECTION_IS_TLS13(s) ? (ticklen == 0 
+        || (SSL_CONNECTION_IS_TLS13(s) ? (ticklen == 0
                                           || PACKET_remaining(pkt) < ticklen)
                                        : PACKET_remaining(pkt) != ticklen)) {
         SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_R_LENGTH_MISMATCH);
@@ -2829,7 +2829,7 @@ MSG_PROCESS_RETURN tls_process_new_session_ticket(SSL_CONNECTION *s,
         static const unsigned char nonce_label[] = "resumption";
 
         /* Ensure cast to size_t is safe */
-        if (!ossl_assert(hashleni >= 0)) {
+        if (!ossl_assert(hashleni > 0)) {
             SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
             goto err;
         }
