@@ -1028,7 +1028,7 @@ fn libprovider(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bu
             .x86, .x86_64 => &.{
                 "providers/implementations/rands/seeding/rand_cpu_x86.c",
             },
-            .aarch64, .aarch64_32 => &.{
+            .aarch64 => &.{
                 "providers/implementations/rands/seeding/rand_cpu_arm64.c",
             },
             else => &.{},
