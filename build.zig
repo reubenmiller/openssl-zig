@@ -43,12 +43,15 @@ fn libcrypto(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.buil
     lib.defineCMacro("OPENSSL_NO_QUIC", null);
     lib.defineCMacro("OPENSSL_NO_THREAD_POOL", null);
     lib.defineCMacro("OPENSSL_NO_STDIO", null);
+    lib.defineCMacro("OPENSSL_NO_JITTER", null);
     lib.defineCMacro("OSSL_PKEY_PARAM_RSA_DERIVE_FROM_PQ", "1");
     if (lib.rootModuleTarget().isMinGW())
         lib.defineCMacro("NOCRYPT", "1");
     if (lib.rootModuleTarget().isDarwin())
         // CommonCrypto
         lib.linkFramework("CoreServices");
+    if (lib.rootModuleTarget().cpu.arch.isRISCV())
+        lib.defineCMacro("__NR_riscv_hwprobe", "(__NR_arch_specific_syscall + 14)");
     lib.addCSourceFiles(.{
         .files = switch (lib.rootModuleTarget().cpu.arch) {
             .arm, .aarch64 => &.{
@@ -72,7 +75,18 @@ fn libcrypto(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.buil
             },
             else => &.{},
         },
-        .flags = cflags,
+        .flags = &.{
+            "-std=gnu99",
+            "-Wno-unknown-warning-option",
+            "-Wswitch-default",
+            "-Wno-parentheses-equality",
+            "-Wno-language-extension-token",
+            "-Wno-extended-offsetof",
+            "-Wconditional-uninitialized",
+            "-Wincompatible-pointer-types-discards-qualifiers",
+            "-Wmissing-variable-declarations",
+            "-Wno-int-conversion",
+        },
     });
     lib.addCSourceFiles(.{
         .files = &.{
@@ -504,7 +518,7 @@ fn libcrypto(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.buil
             "crypto/evp/evp_err.c",
             "crypto/evp/evp_fetch.c",
             "crypto/evp/evp_key.c",
-            "crypto/evp/evp_lib.c",
+            // "crypto/evp/evp_lib.c",
             "crypto/evp/evp_pbe.c",
             "crypto/evp/evp_pkey.c",
             "crypto/evp/evp_rand.c",
@@ -543,7 +557,7 @@ fn libcrypto(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.buil
             "crypto/evp/pmeth_check.c",
             "crypto/evp/pmeth_gn.c",
             "crypto/evp/pmeth_lib.c",
-            "crypto/evp/signature.c",
+            // "crypto/evp/signature.c",
             "crypto/ex_data.c",
             "crypto/ffc/ffc_backend.c",
             "crypto/ffc/ffc_dh.c",
@@ -907,7 +921,6 @@ fn libssl(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin
             "ssl/d1_lib.c",
             "ssl/d1_msg.c",
             "ssl/d1_srtp.c",
-            "ssl/event_queue.c",
             "ssl/methods.c",
             "ssl/pqueue.c",
             "ssl/priority_queue.c",
@@ -1001,7 +1014,7 @@ fn libprovider(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bu
     lib.addIncludePath(b.path("include"));
     lib.addIncludePath(b.path("."));
     lib.addIncludePath(b.path("providers/common/include"));
-    lib.addIncludePath(b.path("providers/fips"));
+    lib.addIncludePath(b.path("providers/fips/include"));
     lib.addIncludePath(b.path("providers/implementations/include"));
     lib.addIncludePath(b.path("include_gen"));
     lib.addIncludePath(b.path("crypto"));
@@ -1065,10 +1078,10 @@ fn libprovider(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bu
             "providers/common/securitycheck_default.c",
             // "providers/common/securitycheck_fips.c",
             "providers/defltprov.c",
-            "providers/fips/fips_entry.c",
-            "providers/fips/fipsprov.c",
-            "providers/fips/self_test.c",
-            "providers/fips/self_test_kats.c",
+            // "providers/fips/fips_entry.c",
+            // "providers/fips/fipsprov.c",
+            // "providers/fips/self_test.c",
+            // "providers/fips/self_test_kats.c",
             "providers/implementations/asymciphers/rsa_enc.c",
             "providers/implementations/asymciphers/sm2_enc.c",
             "providers/implementations/ciphers/cipher_aes.c",
@@ -1115,8 +1128,8 @@ fn libprovider(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bu
             "providers/implementations/ciphers/cipher_idea.c",
             "providers/implementations/ciphers/cipher_idea_hw.c",
             "providers/implementations/ciphers/cipher_null.c",
-            "providers/implementations/ciphers/cipher_rc2.c",
-            "providers/implementations/ciphers/cipher_rc2_hw.c",
+            // "providers/implementations/ciphers/cipher_rc2.c",
+            // "providers/implementations/ciphers/cipher_rc2_hw.c",
             "providers/implementations/ciphers/cipher_rc4.c",
             "providers/implementations/ciphers/cipher_rc4_hmac_md5.c",
             "providers/implementations/ciphers/cipher_rc4_hmac_md5_hw.c",
@@ -1133,14 +1146,14 @@ fn libprovider(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bu
             "providers/implementations/ciphers/cipher_sm4_hw.c",
             "providers/implementations/ciphers/cipher_sm4_xts.c",
             "providers/implementations/ciphers/cipher_sm4_xts_hw.c",
-            "providers/implementations/ciphers/cipher_tdes.c",
-            "providers/implementations/ciphers/cipher_tdes_common.c",
+            // "providers/implementations/ciphers/cipher_tdes.c",
+            // "providers/implementations/ciphers/cipher_tdes_common.c",
             "providers/implementations/ciphers/cipher_tdes_default.c",
             "providers/implementations/ciphers/cipher_tdes_default_hw.c",
             "providers/implementations/ciphers/cipher_tdes_hw.c",
             "providers/implementations/ciphers/cipher_tdes_wrap.c",
             "providers/implementations/ciphers/cipher_tdes_wrap_hw.c",
-            "providers/implementations/ciphers/ciphercommon.c",
+            // "providers/implementations/ciphers/ciphercommon.c",
             "providers/implementations/ciphers/ciphercommon_block.c",
             "providers/implementations/ciphers/ciphercommon_ccm.c",
             "providers/implementations/ciphers/ciphercommon_ccm_hw.c",
@@ -1212,7 +1225,6 @@ fn libprovider(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bu
             "providers/implementations/macs/kmac_prov.c",
             "providers/implementations/macs/poly1305_prov.c",
             "providers/implementations/macs/siphash_prov.c",
-            "providers/implementations/rands/crngt.c",
             "providers/implementations/rands/drbg.c",
             "providers/implementations/rands/drbg_ctr.c",
             "providers/implementations/rands/drbg_hash.c",
@@ -1226,12 +1238,12 @@ fn libprovider(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bu
             // "providers/implementations/rands/seeding/rand_vms.c",
             // "providers/implementations/rands/seeding/rand_vxworks.c",
             "providers/implementations/rands/test_rng.c",
-            "providers/implementations/signature/dsa_sig.c",
-            "providers/implementations/signature/ecdsa_sig.c",
-            "providers/implementations/signature/eddsa_sig.c",
+            // "providers/implementations/signature/dsa_sig.c",
+            // "providers/implementations/signature/ecdsa_sig.c",
+            // "providers/implementations/signature/eddsa_sig.c",
             "providers/implementations/signature/mac_legacy_sig.c",
-            "providers/implementations/signature/rsa_sig.c",
-            "providers/implementations/signature/sm2_sig.c",
+            // "providers/implementations/signature/rsa_sig.c",
+            // "providers/implementations/signature/sm2_sig.c",
             "providers/implementations/storemgmt/file_store.c",
             "providers/implementations/storemgmt/file_store_any2obj.c",
             // "providers/implementations/storemgmt/winstore_store.c",

@@ -465,6 +465,11 @@ typedef struct PBKDF2PARAM_st {
     X509_ALGOR *prf;
 } PBKDF2PARAM;
 
+typedef struct {
+    X509_ALGOR *keyDerivationFunc;
+    X509_ALGOR *messageAuthScheme;
+} PBMAC1PARAM;
+
 #ifndef OPENSSL_NO_SCRYPT
 typedef struct SCRYPT_PARAMS_st {
     ASN1_OCTET_STRING *salt;
