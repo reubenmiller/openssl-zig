@@ -1268,6 +1268,8 @@ const cflags = &.{
     "-Wincompatible-pointer-types-discards-qualifiers",
     "-Wmissing-variable-declarations",
     "-Wno-int-conversion",
+    // Hack: Allow duplicate symbols
+    "-Wl,--allow-multiple-definition",
 };
 
 const BuildInfo = struct {
