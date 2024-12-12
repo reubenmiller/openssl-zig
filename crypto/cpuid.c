@@ -162,9 +162,9 @@ unsigned int OPENSSL_ia32cap_P[4];
 
 #ifndef OPENSSL_CPUID_OBJ
 # ifndef OPENSSL_CPUID_SETUP
-void OPENSSL_cpuid_setup(void)
-{
-}
+// void OPENSSL_cpuid_setup(void)
+// {
+// }
 # endif
 
 /*
