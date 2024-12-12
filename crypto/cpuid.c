@@ -197,10 +197,11 @@ int CRYPTO_memcmp(const void *in_a, const void *in_b, size_t len)
 /*
  * For systems that don't provide an instruction counter register or equivalent.
  */
-uint32_t OPENSSL_rdtsc(void)
-{
-    return 0;
-}
+// hack
+//uint32_t OPENSSL_rdtsc(void)
+//{
+//    return 0;
+//}
 
 size_t OPENSSL_instrument_bus(unsigned int *out, size_t cnt)
 {
