@@ -1027,6 +1027,7 @@ fn libprovider(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bu
     lib.defineCMacro("OPENSSL_NO_KTLS", null);
     lib.defineCMacro("OPENSSL_NO_QUIC", null);
     lib.defineCMacro("OPENSSL_CPUID_OBJ", null);
+    lib.defineCMacro("OPENSSL_CPUID_SETUP", null);
     lib.defineCMacro("OSSL_RAND_PARAM_GENERATE", null);
     if (lib.rootModuleTarget().isDarwin()) {
         // CommonCrypto
